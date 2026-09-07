@@ -81,7 +81,7 @@ from datetime import datetime
 from collections import Counter, OrderedDict
 from typing import Optional, Dict, List, Tuple, Any, Callable
 
-import firmware_registry  # APOGEE_P2_SPEC.md §30 — fast-path dialect lookup
+import firmware_registry  # build-tag cache: platform and string encoding, NOT framing
 import p2_data            # compiled-in opcode / point-type / enum tables
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ import p2_data            # compiled-in opcode / point-type / enum tables
 # The published, self-contained reference is PROTOCOL.md in this repo. Where a
 # claim here matters to a reader, the equivalent PROTOCOL.md section is:
 #   frame layout / framing over TCP ......... §6.1
-#   message classes & dialects .............. §6.2
+#   msg_type is a header length .............. §6.2
 #   direction byte .......................... §6.3
 #   routing slots ........................... §6.4
 #   sequence & request/response pairing ..... §6.5
@@ -161,10 +161,8 @@ SCANNER_NAME = _GENERIC_SCANNER_NAME
 DEBUG_READS = False              # When True, print raw hex on parse failures
 CONNECT_TIMEOUT = 5              # TCP connect timeout (seconds)
 READ_TIMEOUT = 10                # Read response timeout (seconds)
-HANDSHAKE_PROBE_TIMEOUT = 2.0    # First-dialect probe timeout — see _handshake(). A PXC speaking the legacy dialect
-                                 # responds well under a second; a PXC speaking the modern dialect stays silent.
-                                 # Setting this too long makes modern-dialect panels slow to connect; too short and
-                                 # a congested network falsely fails the first attempt.
+# (HANDSHAKE_PROBE_TIMEOUT is gone with the dialect probe it timed. There is
+# nothing to probe: msg_type is computed, see p2_frame().)
 
 # Known nodes (optional — populated by discovery or site config file)
 # Format: {"NODE_NAME": "IP_ADDRESS", ...}
@@ -318,7 +316,7 @@ def save_config(filepath: str):
     """Save learned P2 network config to a JSON file.
 
     Also persists the firmware_registry build-tag cache under
-    ``known_builds`` so the next process can skip the §11.2 dialect probe
+    ``known_builds`` so the next process knows each panel's platform
     on first contact to known panels.
     """
     config = {
@@ -854,11 +852,13 @@ QUICK_SCAN_POINTS = [
 
 class P2Message:
     """Represents a single P2 protocol message."""
-    # Message types
-    TYPE_CONNECT   = 0x2E   # legacy 2nd channel (announce + DB-change/replication); name kept for compat
-    TYPE_ANNOUNCE  = 0x2F   # modern 2nd channel (same role as 0x2E, by firmware generation)
-    TYPE_DATA      = 0x33
-    TYPE_HEARTBEAT = 0x34
+    # There are no "message types". The u32 at offset 4 is a HEADER LENGTH --
+    # 13 + the total bytes of the four NUL-terminated routing slots (PROTOCOL.md
+    # 6.2). Earlier releases of this scanner defined TYPE_DATA = 0x33 and
+    # TYPE_HEARTBEAT = 0x34 and probed between them; those constants were the
+    # value this site's node names happen to produce, and hard-coding them makes
+    # the scanner unusable anywhere else. The panel discards a frame whose value
+    # does not match its own slots, without replying. Use msg_type_for().
 
     # Response direction byte (first byte of S2C payload)
     DIR_REQUEST   = 0x00   # C2S
@@ -867,8 +867,8 @@ class P2Message:
 
     # Opcode / marker constants (big-endian 16-bit opcodes live inside 0x33/0x34 payloads)
     OP_IDENTIFY        = 0x4640  # mid-session identity refresh
-    OP_READ_EXTENDED   = 0x0271  # point read (legacy-dialect clients)
-    OP_READ_SHORT      = 0x0220  # point read (modern-dialect clients)
+    OP_READ_EXTENDED   = 0x0271  # point read (extended form)
+    OP_READ_SHORT      = 0x0220  # point read (short form)
     OP_WRITE_NOVALUE   = 0x0273  # Desigo's UI point-existence probe (dominant use, 500x more common than alarm-ack); also AlarmAckTrigger before 0x0509
     OP_VALUE_PUSH      = 0x0274  # bidirectional: DCC->PXC virtual-write, or PXC->DCC COV
     OP_WRITE_QUALITY   = 0x0240  # WriteWithQuality. 5034 PXC->DCC NONE/sep=0x00 (ACK'd) vs 5033 DCC->PXC SYST/sep=0x23 (errors 0x0E15 — Desigo retries with 0x4222)
@@ -982,7 +982,30 @@ class P2Message:
             and struct.unpack('>H', payload)[0] in self.BARE_PING_OPCODES
         ) if payload else False
 
+    @staticmethod
+    def msg_type_for(payload: bytes) -> int:
+        """13 + the total bytes of the four NUL-terminated routing slots.
+
+        `payload` is what follows the 12-byte fixed header: one direction byte,
+        then the four slots, then the opcode and body. Walking to the fourth NUL
+        gives `1 + slot bytes`, so the answer is 12 + that.
+
+        This is the field PROTOCOL.md 6.2 documents. It is not a choice.
+        """
+        off = 1                       # payload[0] is the direction byte
+        for i in range(4):
+            z = payload.find(b'\x00', off)
+            if z < 0:
+                raise ValueError(
+                    'payload has no slot %d terminator; cannot frame it' % i)
+            off = z + 1
+        return 12 + off
+
     def to_bytes(self) -> bytes:
+        # Always DERIVED, never taken from self.msg_type -- that attribute
+        # carries what was parsed off the wire by from_bytes(), which is the
+        # wrong number for a frame we are building with our own slot names.
+        self.msg_type = self.msg_type_for(self.payload)
         total_len = 12 + len(self.payload)
         header = struct.pack('>III', total_len, self.msg_type, self.sequence)
         return header + self.payload
@@ -995,6 +1018,19 @@ class P2Message:
         payload = data[12:total_len]
         return cls(msg_type, sequence, payload)
 
+
+
+
+def p2_frame(payload: bytes, seq: int) -> bytes:
+    """A complete P2 frame: the 12-byte header with a DERIVED `msg_type`.
+
+    `msg_type` is `13 + the total bytes of the four routing slots`
+    (PROTOCOL.md 6.2), so it depends on the very payload being framed and
+    cannot be carried over from an earlier frame with different routing.
+    Every hand-built frame in this file goes through here for that reason.
+    """
+    return struct.pack('>III', 12 + len(payload),
+                       P2Message.msg_type_for(payload), seq) + payload
 
 
 # ---------------------------------------------------------------------------
@@ -1088,7 +1124,7 @@ def check_emit_allowed(opcode: int) -> None:
     Deliberately not overridable by a flag: a determined caller can edit the
     source, but nobody does that by accident.
 
-    Coverage, stated honestly: a few standalone helpers (dialect probe, cold
+    Coverage, stated honestly: a few standalone helpers (handshake, cold
     discovery) build raw frames and call sock.sendall directly, bypassing this
     check. Audited at the time of writing -- the only EBLN opcodes any of them
     emit are 0x4634 REPL_PULL and 0x4640 PING, both permitted. If you add a
@@ -1139,11 +1175,8 @@ class P2Connection:
         self.sequence = secrets.randbits(24)
         self.node_name = None      # Learned from responses
         self._recv_buffer = b""
-        # Dialect detection — see _handshake() for why this matters.
-        # Initialized to TYPE_DATA (legacy PME1252 and earlier). If the target
-        # turns out to speak the PME1300 dialect, _handshake() flips this to
-        # TYPE_HEARTBEAT and every subsequent message uses the new type.
-        self.op_msg_type = P2Message.TYPE_DATA
+        # No dialect state. msg_type is computed per frame from that frame's
+        # own routing slots (P2Message.msg_type_for).
         # Optional event hook for frames _recv_response chooses not to pair
         # with the in-flight request — bare-opcode keepalives (§9.13),
         # out-of-window sequence numbers, async COV pushes on the same
@@ -1175,29 +1208,21 @@ class P2Connection:
         return True
 
     def _handshake(self, node_name: str) -> bool:
-        """Establish a P2 session, auto-detecting the PXC's message-type dialect.
+        """Send the identity block and wait for the panel's reply.
 
-        Two dialects are in use across Siemens PXC firmware:
-          - **Legacy (PME1252 and earlier)**: operational traffic uses TYPE_DATA (0x33).
-            The handshake exchange itself is 0x33-in, 0x33-out.
-          - **Modern (firmware build PME1300, PXME hardware platform)**:
-            operational traffic uses TYPE_HEARTBEAT (0x34). The handshake
-            is 0x34-in, 0x34-out, and the panel typically initiates with
-            a 0x2F ANNOUNCE to the supervisor.
+        There is nothing to negotiate. Earlier releases auto-detected a
+        firmware "dialect" here -- a registry lookup, a per-host cache, and a
+        two-attempt probe of 0x33 then 0x34 with a tuned short timeout. That
+        machinery was a two-guess search over a **length**: `msg_type` is
+        `13 + the total bytes of the four routing slots` (PROTOCOL.md 6.2), and
+        51 and 52 are simply what this project's own node names summed to. At a
+        site whose names sum to anything else, both guesses are wrong and the
+        panel answers neither -- which is visible in this project's captures as
+        connections that sent 51 then 52 against slots totalling 44 and got
+        silence both times.
 
-        A PXC speaking the modern dialect will silently drop our 0x33 handshake
-        (not RST, not respond — just ignore). So the detection logic is: try 0x33
-        first with a short timeout; if nothing comes back, retry as 0x34. Whichever
-        wins is locked in on self.op_msg_type for every subsequent message this
-        connection sends.
-
-        Result is cached in _DIALECT_CACHE keyed by host IP, so repeated connects
-        to the same PXC within one process skip the probe.
-
-        Important: we must rebuild and re-send the identity block with a fresh seq
-        on retry. The PXC ties its response to the seq of the request that reached
-        it, so reusing the original seq after a timeout is fine for our own tracking
-        but pointless — the first seq's response will never come.
+        `P2Message.to_bytes()` now derives the value from the frame's own slots,
+        so one attempt is the whole handshake.
         """
         net = _wire_name(self.network, 'BLN name (network)')
         src = _wire_name(node_name, 'node name')
@@ -1212,126 +1237,46 @@ class P2Connection:
             scanner + b'\x00'
         )
 
-        def build_identity():
-            # Fresh timestamp on every attempt. PXCs may reject handshakes with
-            # suspiciously old timestamps from the same scanner — rebuilding it
-            # per attempt keeps the retry clean.
-            #
-            # Trailer layout (16 bytes total) per APOGEE_P2_SPEC.md Connection-handshake
-            # section, verified against the corpus:
-            #   1 byte   separator (0x00)
-            #   3 bytes  flags (0x01 0x01 0x00)  — third byte is the role flag;
-            #            0x00 = "configured peer" (DCC-style), what we want
-            #   5 bytes  reserved zeros
-            #   4 bytes  timestamp (BE u32, Unix epoch seconds)
-            #   2 bytes  session id (0x00 0x00 = panel-style; bouncer accepts;
-            #            real DCC uses per-session non-zero values but copying
-            #            one risks colliding with an active session)
-            #   1 byte   trailing null
-            return (
-                b'\x46\x40' +
-                b'\x01' + struct.pack('>H', len(scanner)) + scanner +
-                b'\x01' + struct.pack('>H', len(site)) + site +
-                b'\x01' + struct.pack('>H', len(net)) + net +
-                b'\x00\x01\x01\x00' +                  # separator + 3 flag bytes
-                b'\x00\x00\x00\x00\x00' +              # 5 reserved zeros
-                struct.pack('>I', int(time.time())) + # 4-byte timestamp
-                b'\x00\x00' +                          # 2-byte session id
-                b'\x00'                                # trailing null
-            )
+        # Trailer layout (16 bytes) per PROTOCOL.md's connection-handshake
+        # section, verified against the corpus:
+        #   1 byte   separator (0x00)
+        #   3 bytes  flags (0x01 0x01 0x00) - third byte is the role flag;
+        #            0x00 = "configured peer" (DCC-style), what we want
+        #   5 bytes  reserved zeros
+        #   4 bytes  timestamp (BE u32, Unix epoch seconds)
+        #   2 bytes  session id (0x00 0x00 = panel-style; the bouncer accepts
+        #            it; a real DCC uses per-session non-zero values but
+        #            copying one risks colliding with an active session)
+        #   1 byte   trailing null
+        identity = (
+            b'\x46\x40' +
+            b'\x01' + struct.pack('>H', len(scanner)) + scanner +
+            b'\x01' + struct.pack('>H', len(site)) + site +
+            b'\x01' + struct.pack('>H', len(net)) + net +
+            b'\x00\x01\x01\x00' +
+            b'\x00\x00\x00\x00\x00' +
+            struct.pack('>I', int(time.time())) +
+            b'\x00\x00' +
+            b'\x00'
+        )
 
-        # ── Fast path A — registry lookup by cached firmware build tag.
-        # APOGEE_P2_SPEC.md §30.4. Survives process restart via
-        # site.json's known_builds field; can also fast-fail BACnet panels
-        # (BME####) without paying the §11.2 dialect-probe wait.
-        build_tag = firmware_registry.get_cached_build_tag(self.host)
-        if build_tag is not None:
-            negotiated = firmware_registry.negotiate_dialect(build_tag)
-            if negotiated is not None:
-                dialect, _read_family = negotiated
-                if dialect == 'n/a':
-                    print(f"  [INFO] {self.host} build {build_tag} is "
-                          "BACnet firmware; unreachable via P2.")
-                    return False
-                seq = self._next_seq()
-                mt = (P2Message.TYPE_HEARTBEAT if dialect == 'modern'
-                      else P2Message.TYPE_DATA)
-                msg = P2Message(mt, seq, routing + build_identity())
-                if self._send_message(msg):
-                    resp = self._recv_response(seq, max_attempts=5)
-                    if resp is not None:
-                        self.op_msg_type = mt
-                        _DIALECT_CACHE[self.host] = (
-                            0x33 if mt == P2Message.TYPE_DATA else 0x34)
-                        return True
-                # Tag is stale (firmware upgrade, panel swap, etc.).
-                # Evict and fall through to the probe path.
-                firmware_registry.evict_build_tag(self.host)
-                self._recv_buffer = b""
-
-        # ── Fast path B — process-local dialect cache.
-        # Skip the probe if we've talked to this panel before this run.
-        cached_dialect = _DIALECT_CACHE.get(self.host)
-        if cached_dialect is not None:
-            seq = self._next_seq()
-            mt = P2Message.TYPE_DATA if cached_dialect == 0x33 else P2Message.TYPE_HEARTBEAT
-            msg = P2Message(mt, seq, routing + build_identity())
-            if not self._send_message(msg):
-                return False
-            resp = self._recv_response(seq, max_attempts=5)
-            if resp is not None:
-                self.op_msg_type = mt
-                return True
-            # Cached value didn't work — maybe firmware upgraded or cache stale.
-            # Fall through to full probe, but evict the bad cache entry first.
-            _DIALECT_CACHE.pop(self.host, None)
-            self._recv_buffer = b""
-
-        # Attempt 1: legacy TYPE_DATA (0x33) dialect.
+        payload = routing + identity
         seq = self._next_seq()
-        msg = P2Message(P2Message.TYPE_DATA, seq, routing + build_identity())
-        if not self._send_message(msg):
-            return False
-
-        # Short first timeout — if the target speaks the legacy dialect, it
-        # responds in well under a second. Waiting the full READ_TIMEOUT here
-        # would make every modern-dialect PXC painfully slow to detect.
-        original_timeout = self.sock.gettimeout() if self.sock else READ_TIMEOUT
-        try:
-            if self.sock:
-                self.sock.settimeout(HANDSHAKE_PROBE_TIMEOUT)
-            resp = self._recv_response(seq, max_attempts=3)
-        finally:
-            if self.sock:
-                try: self.sock.settimeout(original_timeout)
-                except Exception: pass
-
-        if resp is not None:
-            # Confirm the response msg_type — this is what the panel wants us
-            # to speak. The common case (PME1252) will be TYPE_DATA; odd panels
-            # that respond with TYPE_HEARTBEAT to a TYPE_DATA probe are rare
-            # but handled correctly here.
-            self.op_msg_type = resp.msg_type if resp.msg_type in (
-                P2Message.TYPE_DATA, P2Message.TYPE_HEARTBEAT
-            ) else P2Message.TYPE_DATA
-            _DIALECT_CACHE[self.host] = 0x33 if self.op_msg_type == P2Message.TYPE_DATA else 0x34
-            return True
-
-        # Attempt 2: modern TYPE_HEARTBEAT (0x34) dialect.
-        # Before retrying we need to drain any stale bytes in our recv buffer —
-        # a late response from attempt 1 would otherwise confuse the next read.
-        self._recv_buffer = b""
-        seq = self._next_seq()
-        msg = P2Message(P2Message.TYPE_HEARTBEAT, seq, routing + build_identity())
+        msg = P2Message(P2Message.msg_type_for(payload), seq, payload)
         if not self._send_message(msg):
             return False
 
         resp = self._recv_response(seq, max_attempts=5)
         if resp is not None:
-            self.op_msg_type = P2Message.TYPE_HEARTBEAT
-            _DIALECT_CACHE[self.host] = 0x34
             return True
 
+        # No reply. The most likely cause is a wrong BLN or node name, not a
+        # wrong msg_type -- state the computed framing so that is checkable
+        # rather than leaving the caller to guess.
+        print("  [WARN] %s did not answer the identity block. Framed with "
+              "msg_type=%d (13 + %d slot bytes) for BLN %r, node %r, scanner %r."
+              % (self.host, P2Message.msg_type_for(payload), len(payload) - 1
+                 - len(identity), self.network, node_name, self.scanner_name))
         return False
 
     def close(self):
@@ -1505,7 +1450,7 @@ class P2Connection:
             b'\x00\xff'
         )
 
-        msg = P2Message(self.op_msg_type, seq, read_payload)
+        msg = P2Message(P2Message.msg_type_for(read_payload), seq, read_payload)
         if not self._send_message(msg):
             return None
 
@@ -1781,7 +1726,7 @@ class P2Connection:
         seq = self._next_seq()
         routing = self._build_routing(node_name)
         body = struct.pack('>H', P2Message.OP_SYSINFO_COMPACT)
-        msg = P2Message(self.op_msg_type, seq, routing + body)
+        msg = P2Message(P2Message.msg_type_for(routing + body), seq, routing + body)
         if not self._send_message(msg):
             return None
         resp = self._recv_response(seq)
@@ -1798,10 +1743,10 @@ class P2Connection:
             'build_date': data_strings[2] if len(data_strings) > 2 else '',
             'raw_strings': data_strings,
         }
-        # Cache the firmware-build tag for the §30.4 dialect fast-path.
+        # Cache the firmware-build tag: platform and string encoding.
         # The "model" TLV (Siemens-internally labeled) actually holds the
         # build identifier like "PME1300 ". Subsequent connects to this
-        # host will skip the §11.2 dialect probe via firmware_registry.
+        # host knows the platform without re-reading CABINET_DISPLAY.
         build_tag = firmware_registry.parse_build_tag(result['model'])
         if build_tag:
             firmware_registry.cache_build_tag(self.host, build_tag)
@@ -1866,7 +1811,7 @@ class P2Connection:
                     b'\x00\x00' +
                     b'\x01' + struct.pack('>H', len(cur)) + cur +
                     b'\x01\x00\x00')
-            msg = P2Message(self.op_msg_type, seq, routing + body)
+            msg = P2Message(P2Message.msg_type_for(routing + body), seq, routing + body)
             if not self._send_message(msg):
                 return None
             resp = self._recv_response(seq)
@@ -1961,7 +1906,7 @@ class P2Connection:
         """Extract {device, point, value, units} from a 0x0981 response payload.
 
         Three response shapes observed. The shape the panel picks depends on
-        (a) firmware dialect (PME1252 vs PME1300) and (b) point type (physical
+        (a) firmware build (PME1252 vs PME1300) and (b) point type (physical
         sensor with a quality register vs PPCL-computed variable vs Title-only
         panel entry).
 
@@ -2327,7 +2272,7 @@ class P2Connection:
                     b'\x00\x00' +
                     b'\x01' + struct.pack('>H', len(current_name)) + current_name +
                     struct.pack('>H', current_line))              # u16 BE line number
-            msg = P2Message(self.op_msg_type, seq, routing + body)
+            msg = P2Message(P2Message.msg_type_for(routing + body), seq, routing + body)
             if not self._send_message(msg):
                 break
             resp = self._recv_response(seq)
@@ -2455,7 +2400,7 @@ class P2Connection:
             b'\x00\x00\x01\x00\x00\xff\xff'
         )
 
-        msg = P2Message(self.op_msg_type, seq, browse_payload)
+        msg = P2Message(P2Message.msg_type_for(browse_payload), seq, browse_payload)
         if not self._send_message(msg):
             return None
 
@@ -3639,11 +3584,8 @@ def discover_node_name(host: str) -> Optional[str]:
     return result['node_name'] if result else None
 
 
-# Per-host dialect cache. Keyed by host IP string. Values are 0x33 or 0x34.
-# Saves a ~2-second probe on every subsequent connection to the same PXC within
-# a single process lifetime — notable for building-wide sweeps that hit each
-# panel multiple times (discover, then verify, then read_all).
-_DIALECT_CACHE: Dict[str, int] = {}
+# (The per-host dialect cache is gone. It cached the answer to a question that
+# was never a question -- msg_type is computed per frame, see p2_frame().)
 
 
 def _recv_one_frame(sock: socket.socket, max_payload: int = 65536,
@@ -3689,75 +3631,26 @@ def _recv_one_frame(sock: socket.socket, max_payload: int = 65536,
     return bytes(buf[:total_len])
 
 
-def _probe_dialect(sock: socket.socket, handshake_msg_0x33: bytes,
-                   handshake_msg_0x34: bytes,
-                   host: Optional[str] = None) -> Optional[int]:
-    """Send a handshake probe and detect which message-type dialect the PXC speaks.
+def _send_handshake(sock: socket.socket, handshake: bytes,
+                    host: Optional[str] = None) -> bool:
+    """Send one correctly-framed handshake and report whether anything came back.
 
-    PXC firmware splits into two dialects:
-      - Legacy (PME1252 and earlier): operational traffic uses msg_type 0x33 DATA.
-        Handshake is 0x33-in, 0x33-out.
-      - Modern (firmware build PME1300 on PXME hardware): operational traffic uses msg_type 0x34 HEARTBEAT.
-        Handshake is 0x34-in, 0x34-out.
+    This replaces `_probe_dialect`, which sent the same payload twice under two
+    guessed `msg_type` values and cached the winner per host. There was nothing
+    to guess: the field is `13 + the total bytes of the four routing slots`
+    (PROTOCOL.md 6.2), `p2_frame()` computes it, and 0x33/0x34 were only ever
+    the numbers this project's own node names happened to produce.
 
-    A PXC silently drops handshakes sent with the wrong msg_type. The detection
-    strategy: try 0x33 first with a short timeout; if nothing comes back, retry
-    as 0x34. Returns the confirmed msg_type (0x33 or 0x34) on success, or None on
-    total failure.
-
-    Both handshake payloads should be pre-built by the caller with identical
-    routing + identity bodies but different msg_type bytes in the 12-byte header.
-
-    If `host` is provided, the detected dialect is cached for subsequent calls
-    against the same host. The cache is process-local — site.json doesn't
-    persist it, so a fresh process pays the probe cost once per panel.
+    `host` is accepted and ignored; the per-host cache it fed is gone.
     """
-    # Check cache first. If we've seen this host before, skip the probe.
-    if host is not None and host in _DIALECT_CACHE:
-        cached = _DIALECT_CACHE[host]
-        msg = handshake_msg_0x33 if cached == 0x33 else handshake_msg_0x34
-        try:
-            sock.sendall(msg)
-            sock.settimeout(3.0)
-            data = sock.recv(4096)
-            if data:
-                return cached
-            # Cache hit produced no response — panel may have flipped dialect
-            # (firmware upgrade?) or the cache entry is stale. Fall through to
-            # full probe to rediscover.
-            del _DIALECT_CACHE[host]
-        except socket.error:
-            # Socket died mid-cache-check. Caller has to deal with this.
-            return None
-
     try:
-        sock.sendall(handshake_msg_0x33)
-        sock.settimeout(HANDSHAKE_PROBE_TIMEOUT)
-        data = sock.recv(4096)
-        if data:
-            # Legacy dialect confirmed — use 0x33 for the rest of the session
-            if host is not None:
-                _DIALECT_CACHE[host] = 0x33
-            return 0x33
-    except socket.timeout:
-        pass
-    except socket.error:
-        return None
-
-    # No response on 0x33. Try 0x34.
-    try:
-        sock.sendall(handshake_msg_0x34)
+        sock.sendall(handshake)
         sock.settimeout(3.0)
-        data = sock.recv(4096)
-        if data:
-            if host is not None:
-                _DIALECT_CACHE[host] = 0x34
-            return 0x34
-    except (socket.timeout, socket.error):
-        return None
-
-    return None
-
+        return bool(sock.recv(4096))
+    except socket.timeout:
+        return False
+    except socket.error:
+        return False
 
 def get_node_info(host: str, node_name: str) -> Optional[Dict]:
     """
@@ -3776,8 +3669,7 @@ def get_node_info(host: str, node_name: str) -> Optional[Dict]:
     site = (P2_SITE if P2_SITE else "SITE").encode('ascii')
     node_lower = node_name.lower().encode('ascii')
 
-    # Build the handshake payload once. We'll wrap it with two different msg_type
-    # bytes and try each in turn via _probe_dialect().
+    # Build the handshake payload; p2_frame() derives its msg_type.
     routing = b'\x00' + net + b'\x00' + node_lower + b'\x00' + net + b'\x00' + scanner + b'\x00'
     identity = (
         b'\x46\x40' +
@@ -3791,14 +3683,8 @@ def get_node_info(host: str, node_name: str) -> Optional[Dict]:
         struct.pack('>I', int(time.time())) + b'\x00\x00\x00'
     )
     # Random 24-bit seq matches real Desigo behavior — see APOGEE_P2_SPEC.md
-    # "Sequence number field". Both dialect probes share the seq so they
-    # look like alternative attempts of one handshake.
     _hs_seq = secrets.randbits(24)
-    hs_0x33 = struct.pack('>III', 12 + len(routing) + len(identity), 0x33, _hs_seq) + routing + identity
-    hs_0x34 = struct.pack('>III', 12 + len(routing) + len(identity), 0x34, _hs_seq) + routing + identity
-
-    dialect = _probe_dialect(s, hs_0x33, hs_0x34, host=host)
-    if dialect is None:
+    if not _send_handshake(s, p2_frame(routing + identity, _hs_seq), host=host):
         s.close()
         return None
 
@@ -3809,7 +3695,7 @@ def get_node_info(host: str, node_name: str) -> Optional[Dict]:
     # stricter future firmware may reject; matches the P2Connection
     # convention (see APOGEE_P2_SPEC.md §5.2 / §8.4).
     _info_seq = secrets.randbits(24)
-    msg = struct.pack('>III', 12 + len(info_routing) + len(info_data), dialect, _info_seq) + info_routing + info_data
+    msg = p2_frame(info_routing + info_data, _info_seq)
 
     try:
         s.sendall(msg)
@@ -3898,8 +3784,7 @@ def enumerate_fln_devices(host: str, node_name: str) -> List[Dict]:
         site = (P2_SITE if P2_SITE else "SITE").encode('ascii')
         node_lower = node_name.lower().encode('ascii')
 
-        # Build both dialect variants of the handshake and probe to see which the
-        # PXC wants. See _probe_dialect() for why this exists.
+        # Build the handshake payload; p2_frame() derives its msg_type.
         routing = b'\x00' + net + b'\x00' + node_lower + b'\x00' + net + b'\x00' + scanner + b'\x00'
         identity = (
             b'\x46\x40' +
@@ -3913,14 +3798,8 @@ def enumerate_fln_devices(host: str, node_name: str) -> List[Dict]:
             struct.pack('>I', int(time.time())) + b'\x00\x00\x00'
         )
         # Random 24-bit seq matches real Desigo behavior — see APOGEE_P2_SPEC.md
-        # "Sequence number field". Both dialect probes share the seq so they
-        # look like alternative attempts of one handshake.
         _hs_seq = secrets.randbits(24)
-        hs_0x33 = struct.pack('>III', 12 + len(routing) + len(identity), 0x33, _hs_seq) + routing + identity
-        hs_0x34 = struct.pack('>III', 12 + len(routing) + len(identity), 0x34, _hs_seq) + routing + identity
-
-        dialect = _probe_dialect(s, hs_0x33, hs_0x34, host=host)
-        if dialect is None:
+        if not _send_handshake(s, p2_frame(routing + identity, _hs_seq), host=host):
             s.close()
             print(f"    [ERROR] Handshake failed")
             return []
@@ -3938,7 +3817,7 @@ def enumerate_fln_devices(host: str, node_name: str) -> List[Dict]:
                          b'\x00\x00\x00' + struct.pack('>H', 1) + b'*' +
                          b'\x00\x00\x00' + struct.pack('>H', len(cb)) + cb)
             enum_routing = b'\x00' + net + b'\x00' + node_lower + b'\x00' + net + b'\x00' + scanner + b'\x00'
-            msg = struct.pack('>III', 12 + len(enum_routing) + len(enum_data), dialect, seq) + enum_routing + enum_data
+            msg = p2_frame(enum_routing + enum_data, seq)
         
             try:
                 s.sendall(msg)
@@ -4249,7 +4128,7 @@ def discover_devices_on_node(host: str, node_name: str,
         site = (P2_SITE if P2_SITE else "SITE").encode('ascii')
         node_lower = node_name.lower().encode('ascii')
 
-        # Build both dialect variants for probe.
+        # Build the handshake payload; p2_frame() derives its msg_type.
         routing_hb = b'\x00' + net + b'\x00' + node_lower + b'\x00' + net + b'\x00' + scanner + b'\x00'
         identity = (
             b'\x46\x40' +
@@ -4263,12 +4142,8 @@ def discover_devices_on_node(host: str, node_name: str,
             struct.pack('>I', int(time.time())) + b'\x00\x00\x00'
         )
         hb_payload = routing_hb + identity
-        _hs_seq = secrets.randbits(24)  # See APOGEE_P2_SPEC.md §5.2 / §8.4
-        hs_0x33 = struct.pack('>III', 12 + len(hb_payload), 0x33, _hs_seq) + hb_payload
-        hs_0x34 = struct.pack('>III', 12 + len(hb_payload), 0x34, _hs_seq) + hb_payload
-
-        dialect = _probe_dialect(s, hs_0x33, hs_0x34, host=host)
-        if dialect is None:
+        _hs_seq = secrets.randbits(24)  # random 24-bit seq, as a real supervisor uses
+        if not _send_handshake(s, p2_frame(hb_payload, _hs_seq), host=host):
             s.close()
             print(f"    [ERROR] Handshake failed")
             return []
@@ -4301,7 +4176,7 @@ def discover_devices_on_node(host: str, node_name: str,
                     b'\x00\xff'
                 )
                 payload = routing + read_data
-                msg = struct.pack('>III', 12 + len(payload), dialect, seq) + payload
+                msg = p2_frame(payload, seq)
                 batch_msgs += msg
 
             try:
@@ -5329,8 +5204,9 @@ def _cold_status_query_probe(host: str, scanner_name: str,
     payload = routing + body
     seq = secrets.randbits(24)
 
-    for msg_type in (P2Message.TYPE_DATA, P2Message.TYPE_HEARTBEAT):
-        frame = struct.pack('>III', 12 + len(payload), msg_type, seq) + payload
+    # One attempt. This used to loop over 0x33 and 0x34; see p2_frame().
+    for _once in (0,):
+        frame = p2_frame(payload, seq)
         sock = None
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -7113,7 +6989,12 @@ def listen_for_push_notifications(port: int = 5033, duration: Optional[int] = No
                         event['src_node'] = names[3] if len(names) > 3 else '?'
                         event['bln'] = names[0] if names else '?'
 
-                        if msg_type in (P2Message.TYPE_DATA, P2Message.TYPE_HEARTBEAT) and body:
+                        # Gate on DIRECTION, not on msg_type. The comment below
+                        # always said direction was the criterion; the msg_type
+                        # test beside it was a no-op at this site and would skip
+                        # valid frames anywhere else, msg_type being a header
+                        # length (PROTOCOL.md 6.2).
+                        if dir_byte == 0x00 and body:
                             # The 2-byte opcode is meaningful ONLY in dir==0x00 frames
                             # (requests / panel pushes). In a 0x01 success response the
                             # post-routing bytes are payload, and in a 0x05 error they are

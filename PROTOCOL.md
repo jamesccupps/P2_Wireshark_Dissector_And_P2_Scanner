@@ -47,11 +47,11 @@
   - [5.6 Open items — discovery & FLN timing](#56-open-items--discovery--fln-timing)
 - [6. Frame Format (Wire)](#6-frame-format-wire)
   - [6.1 Frame byte layout](#61-frame-byte-layout)
-  - [6.2 The msg_type discriminator (message class / dialect)](#62-the-msg_type-discriminator-message-class--dialect)
+  - [6.2 `msg_type` is a header length, not a message class](#62-msg_type-is-a-header-length-not-a-message-class)
   - [6.3 The direction byte](#63-the-direction-byte)
   - [6.4 Routing slots](#64-routing-slots)
   - [6.5 Sequence number and request/response pairing](#65-sequence-number-and-requestresponse-pairing)
-  - [6.6 Legacy and modern dialect differences](#66-legacy-and-modern-dialect-differences)
+  - [6.6 The "legacy and modern dialect" model, withdrawn](#66-the-legacy-and-modern-dialect-model-withdrawn)
   - [6.7 Segmentation](#67-segmentation)
   - [6.8 The byte-oriented P2 encoding (non-TCP links)](#68-the-byte-oriented-p2-encoding-non-tcp-links)
 - [7. Service Model & Message Types](#7-service-model--message-types)
@@ -159,7 +159,7 @@ P2 ("Protocol II") is the application-layer network protocol of the Siemens APOG
 - **Transport.** TCP, default port **5033** — every field panel and the supervisor listens here; some installations add a second supervisor-side listener on 5034. Frame semantics derive from a frame's contents and direction, never from the TCP port that carried it.
 - **Peer model.** On the backbone (the BLN, also called the ALN) every member — supervisor and panel alike — is an equal node, and any node may originate traffic. "Request" and "response" describe the role of a *frame*, not of a node.
 - **Frame.** Big-endian throughout: `u32 total_len | u32 message_type (low byte = message class) | u32 sequence | u8 direction | four NUL-terminated ASCII routing slots [BLN, dst-node, BLN, src-node] | (request/push frames only) u16 opcode | body`. The opcode is present only on `direction == 0x00` frames; a response is matched to its request by the echoed sequence number.
-- **Dialect.** The message class is a legacy/modern pair fixed by a panel's firmware generation — data `0x33`/`0x34`, second channel `0x2E`/`0x2F`, peer carriers `0x29`/`0x2A` — not by direction. A client reads a panel's firmware once (via `CABINET_DISPLAY`, opcode `0x010C`) and selects the dialect and the string encoding (ASCII vs RAD-50) from it; there is no on-wire negotiation.
+- **`msg_type` is a header length, not a message class.** It is `13 + the total bytes of the four routing slots` — the offset at which the slot block ends. **Compute it; never choose it.** A panel silently discards a frame whose value does not match its own slots, so a client that hard-codes a constant simply goes unanswered. Earlier editions of this document described six "message classes" in legacy/modern "dialect" pairs; that model is withdrawn in full (§6.2). String encoding (ASCII vs RAD-50) *is* a real per-firmware-revision property and is read from `CABINET_DISPLAY` (`0x010C`); framing is not.
 - **Operations.** A 2-byte function code (the "AP2 function code") selects the operation; about 630 are defined and **135** are observed on the wire in the reference corpus (§9.5). The high-volume operations are the COV value push (`0x0274`), the liveness/identity heartbeat (`0x4640`), point command and read (`0x0240` / `0x0220`), COV subscribe/unsubscribe (`0x0271` / `0x0273`), and the database upload/replication family.
 - **Encoding.** Strings are length-prefixed TLVs (`01 00 <len> <ascii>`); analog values are IEEE-754 single-precision big-endian floats; command priority rides a scope tag. Bodies are ordered, positionally-typed field structures (ASDUs).
 - **Control logic.** Panels run a resident, line-numbered control language — Powers Process Control Language (PPCL); the supervisor reads, edits, and uploads it over P2 but never executes it (§14).
@@ -816,7 +816,7 @@ The **AEM (APOGEE Ethernet Microserver)** is a Lantronix-class serial-to-TCP ter
 | Serial line params | 8/N/1, no hardware flow control | [D] |
 | Fallback addressing | AutoIP 169.254.x when no DHCP; SNMP/Telnet/TFTP/HTTP admin services present | [D] |
 
-Critically, the AEM **does not define new P2 framing** [D]. It encapsulates the existing serial P2 byte stream inside a TCP connection — the same bytes that would have crossed the RS-485 trunk, wrapped in TCP. Channel 1 (TCP/3001) is therefore a **second observable P2-bearing TCP port** distinct from native 5033, but the application bytes inside it are serial-BLN P2, not the IP-native framing of §6 (the IP-native handshake/heartbeat opcode behavior is specific to the EBLN stack). An implementer treating an AEM Channel-1 stream must speak the serial-BLN dialect, not assume the TCP/5033 IP-native conventions.
+Critically, the AEM **does not define new P2 framing** [D]. It encapsulates the existing serial P2 byte stream inside a TCP connection — the same bytes that would have crossed the RS-485 trunk, wrapped in TCP. Channel 1 (TCP/3001) is therefore a **second observable P2-bearing TCP port** distinct from native 5033, but the application bytes inside it are serial-BLN P2, not the IP-native framing of §6 (the IP-native handshake/heartbeat opcode behavior is specific to the EBLN stack). An implementer treating an AEM Channel-1 stream must speak the serial-BLN framing, not assume the TCP/5033 IP-native conventions.
 
 ### 4.3 Serial BLN datalink (dedicated RS-485 trunk)
 
@@ -849,7 +849,7 @@ Beneath each panel sits the Field Level Network (FLN), running **P1 (Powers Prot
 | Auto-discover baud | default 1200 baud | [D] |
 | MMI / tool-port baud | 1200–38400 (options 1200/2400/4800/9600/19200/38400) | [D] |
 
-On a modular panel the RS-485 FLN trunks are provided either by built-in ports or by an add-on **RS-485 FLN expansion module** — Siemens' `PXX-485.3` carries "three RS-485 P1 FLN connections OR one MS/TP FLN connection" per the public *PXC Modular Series* datasheet. This module sits on the panel's downstream (field) bus and is wholly separate from the upstream ALN/supervisor link that carries P2 — it has no bearing on the P2 wire dialect (§6.6). [D]
+On a modular panel the RS-485 FLN trunks are provided either by built-in ports or by an add-on **RS-485 FLN expansion module** — Siemens' `PXX-485.3` carries "three RS-485 P1 FLN connections OR one MS/TP FLN connection" per the public *PXC Modular Series* datasheet. This module sits on the panel's downstream (field) bus and is wholly separate from the upstream ALN/supervisor link that carries P2 — it has no bearing on the P2 wire framing (§6.2). [D]
 
 A panel may alternatively host a BACnet MS/TP field bus in place of P1 (`Fln_type_enum`: `P1` = 0, `MSTP` = 1) [S]. Which one is available tracks the panel's **firmware track**, not the hardware: proprietary-P2/APOGEE firmware (the subject of this spec) drives a **P1 FLN only**, while the separate BACnet firmware build of the same hardware adds the MS/TP option. MS/TP is a different protocol stack and is out of scope for this P2 specification; only the P1/FLN bus is treated here. [D]
 
@@ -1333,8 +1333,9 @@ Field names follow the vendor's `ATOMGrainMetaData` / `ATOMReplicationUpToDatene
 This section defines the P2 on-wire frame: the exact byte layout, the message-type
 discriminator, the direction byte, the four routing slots, the opcode field, and segmentation.
 P2 ("Protocol II", the APOGEE BLN/backbone protocol) runs over TCP/5033 (see §4/§3 for transport
-and addressing). The frame format is uniform across all message classes and both protocol
-dialects; only body conventions and session role differ. Every multi-byte integer in the
+and addressing). The frame format is uniform; only body conventions and session role differ.
+(Earlier editions spoke of "message classes" and "protocol dialects" here. There
+are none — the field that appeared to select them is a header length, §6.2.) Every multi-byte integer in the
 header is big-endian (lengths and the sequence number are big-endian u32; the opcode and the
 error code are big-endian u16; analog values in bodies are IEEE-754 big-endian f32).
 
@@ -1385,14 +1386,14 @@ median 85 — but the floor is a property of the format, not of the traffic. [W]
 
 #### 6.1.2 Annotated hex example
 
-A legacy-dialect (`msg_type` low byte `0x33`) ReadShort-class request, addressed from supervisor
+A request whose four routing slots total 38 bytes, so `msg_type` reads `0x33` = 51 = 13 + 38 (§6.2), addressed from supervisor
 identity `P2SCAN|5033` on BLN `BLNNAME` to destination node `NODE1`, carrying opcode `0x0220`
 (`POINT_LOG_VALUE`, the modern compact read) with a `SYST` read-scope prefix. All values are
 sanitized placeholders; the body grammar of a given opcode is defined in §8.
 
 ```
 00 00 00 5E   total_len  = 0x5E = 94 bytes (self-inclusive)            [W]
-00 00 00 33   msg_type   = low byte 0x33 (legacy DATA dialect)         [W]
+00 00 00 33   msg_type   = 51 = 13 + 38 bytes of routing slots        [W]
 00 00 1A 2F   sequence   = 0x00001A2F (per-connection, big-endian)     [W]
 00            dir        = 0x00 (request — opcode IS present)          [W]
 42 4C 4E 4E 41 4D 45 00              slot[0] "BLNNAME"\0   (BLN)        [W]
@@ -1413,109 +1414,131 @@ after the NUL terminator of `slot[3]`. On the matching response (§6.3) `dir` be
 [1] and [3] swap, and the two opcode bytes are absent — the response body begins immediately after
 `slot[3]`'s NUL. See §6.4 for the consequences of reading post-slot bytes off a response frame.
 
-### 6.2 The msg_type discriminator (message class / dialect)
+### 6.2 `msg_type` is a header length, not a message class
 
-`msg_type` is a 32-bit field whose top three bytes are always `0x00 0x00 0x00`; only the low byte
-varies. The low byte is a per-transaction message-class / dialect selector. The header layout and
-the four-slot routing structure are identical for every value — only body conventions and session
-role differ. Six low-byte values are observed; **`0x40` is never observed** in any capture and is
-not a P2 message class. [W]
+**This section previously documented six "message classes" in three
+legacy/modern "dialect" pairs, and every word of that model was wrong.** The
+field is a length. It is retracted in full below, with the evidence, because the
+error was load-bearing: a client built to the old text picks a constant `0x33`
+or `0x34`, and a panel whose node names do not happen to sum to that value
+**silently drops the frame**.
 
-| Low byte | Name | Role | Tag |
-|---|---|---|---|
-| `0x33` | DATA, legacy dialect | Operational data traffic, legacy dialect. The dominant class — the great majority of all request classes. | [W] |
-| `0x34` | DATA, modern dialect | Operational data traffic, modern dialect. Byte-for-byte a `0x33` frame with the low byte incremented; carries the same opcode set. | [W] |
-| `0x2E` | second channel, legacy | Announce / reverse / DB-sync carrier for **legacy-firmware** panels (pairs with `0x33` data). Carries identity (`0x4640`), DB-change/replication records, and alarm prints; may also carry an entire transaction in "single-type carrier" mode. | [W] |
-| `0x2F` | second channel, modern | The **modern-firmware** counterpart of `0x2E` (pairs with `0x34` data) — same role, selected by panel generation, **not** by direction. | [W] |
-| `0x29` | session carrier | Lowest-volume session carrier; appears only at the very start of a connection at low sequence numbers, accompanying session establishment. | [W] |
-| `0x2A` | peer-session carrier | The modern-dialect counterpart of `0x29`, carrying the `EBLN_PING` (`0x4640`) identity exchange in peer-to-peer (panel↔panel) sessions. **Wire-observed in panel-side captures** — 12,556 frames across five taps on two different panels — carrying `0x4640`, `0x0271` and `0x4634`. It is absent from the supervisor-side census only because that vantage point cannot see panel↔panel sessions. Which of `0x29`/`0x2A` a peer uses is a property of that peer, not of the link: see §9.7. | [W] |
+#### 6.2.1 The rule
 
-Class-frequency profile (shape, reproducible per-capture; absolute totals are deployment-dependent):
-`0x33` (legacy data) dominates, then the legacy second-channel `0x2E`, then the modern data dialect
-`0x34`, then the modern second-channel `0x2F`; the session carrier `0x29` is small and the peer
-carrier `0x2A` appears only in panel-to-panel (mirror) captures. **`0x2E` consistently outnumbers
-`0x34`** — the second channel runs on every legacy panel, while `0x34` runs only on the (typically
-few) modern-firmware panels. Representative single 3-hour supervisor capture (≈163,700 P2 frames): `0x33`
-≈ 130,000; `0x2E` ≈ 18,900; `0x34` ≈ 11,500; `0x2F` ≈ 3,300. (A panel-side mirror capture additionally
-shows the peer carriers — in this corpus `0x29` only, 10 frames, §9.7.) [W]
+```
+msg_type = 13 + Σ (len(slot_i) + 1)        for i = 0..3
+```
 
-**The session / second-channel band.** The low-byte values `0x29`–`0x2F` form a **session /
-second-channel band** (`0x29` session carrier, `0x2A` peer-session carrier, `0x2E`
-legacy second channel, `0x2F` modern second channel) — all of which carry the `EBLN_PING` (`0x4640`)
-identity exchange — as distinct from the **data band** `0x33` (legacy dialect) / `0x34` (modern
-dialect) that carries the operational opcode set. The pairing within the band is by **panel firmware
-generation**, not by session role or direction (§6.6): a legacy panel uses `0x2E` in both directions,
-a modern panel uses `0x2F` in both. [W]
+Thirteen is the fixed header ahead of the slots — `u32 total_len` + `u32
+msg_type` + `u32 seq` + `u8 dir` — so the field is simply **the byte offset, from
+the start of the frame, at which the four routing slots end**: where the opcode
+begins on a request, and where the body begins on a response. It is redundant
+with the frame's own geometry, which is exactly what makes it checkable, and the
+panel does check it. [W]
 
-- **`0x2E`** = the **legacy** panel's second channel — the `0x4640` identity exchange plus the
-  panel→supervisor announce and DB-change/replication records and alarm prints (§5.3, §13). [W]
-- **`0x2F`** = the **modern** panel's second channel — the same role as `0x2E`, selected by firmware
-  generation. The identity body is `TLV(node-name) + TLV(site) + TLV(BLN-name)` (the same triple as
-  the `0x4640` `eBLN_Node` body, §5.1, §10.6). [W]
-- **`0x29` / `0x2A`** = the peer (panel↔panel) carriers of the same exchange (session /
-  peer-session), visible only from a panel-side mirror. [W]
+It is a `u32` whose top three bytes are always zero, and that was the first
+thing that should have been suspicious. A class enumeration with six members
+does not need thirty-two bits. A length does.
 
-The residual nuance — which peer is treated as **primary** vs secondary within a panel↔panel
-`0x29`/`0x2A` session (and on what criterion the primary is chosen) — is not pinned. The role/initiator
-meaning of the band itself is established. [W][OPEN]
+#### 6.2.2 The evidence
 
-**Parsing vs emitting.** `0x33` and `0x34` are interchangeable for parsing — a receiver treats
-them identically. Only the **emit-side** dialect choice must match the peer. When a client must
-discover a peer's dialect, the candidate set is exactly `{0x33, 0x34}`, probed in that order; the
-carriers `0x2E`/`0x2F`/`0x29`/`0x2A` are session/second-channel carriers, **not** data dialects, and
-MUST NOT be iterated during dialect detection. Dialect is not negotiated by a handshake message; it is
-a **fixed per-peer property of the panel's model + firmware generation** (§6.6) — legacy panels speak
-`0x33`+`0x2E`, the newer platform speaks `0x34`+`0x2F` — and is best discovered by fingerprinting the
-peer via `CABINET_DISPLAY` (`0x010C`, §10.5) rather than blind-probing. [W]
+Every figure here is over the 638,080 trusted frames of the corpus, and none of
+it needed a capture that did not already exist: [W]
 
-**The second channel (`0x2E`/`0x2F`) carries more than identity.** Between a supervisor and a panel,
-the `0x2E` (legacy) / `0x2F` (modern) class is the **announce / reverse / DB-sync channel**: besides
-the `0x4640` identity exchange it carries database-change and replication records (`DBCHANGE_*`,
-`UPL_ADDED_*`, `UPL_DEL_*`) and alarm prints (`ALARM_PRINT 0x0508`) flowing panel→supervisor. The
-peer (panel↔panel) carriers `0x29` and `0x2A` are visible only from a panel-side mirror, never from
-the supervisor's own vantage. Measured there, **both are dominated by the `0x4640` identity/keepalive
-exchange**, not by COV: across five panel-side captures on two panels `0x29` carries `0x4640` (43,610), then `0x4634` (6,223),
-then `0x0271` (245), with `0x4633`/`0x4636` in single figures, and `0x2A` carries `0x4640` in roughly
-ninety-nine frames out of a hundred (6,228) with `0x0271` (46) and `0x4634` (4) making up the rest. An earlier edition described `0x2A` as the
-panel↔panel COV-subscription carrier; COV management rides it, but calling it that mistakes a minority
-of its traffic for its purpose. [W]
+| test | result |
+|---|---|
+| `msg_type == 13 + total slot bytes` | **637,343 of 638,080 — 99.885%** |
+| header length (frame length − body length) | exactly `msg_type` on every response, `msg_type + 2` on every request — the 2 being the opcode a request carries and a response does not |
+| the 737 exceptions | **every one** from this project's own two research hosts. Not one from a supervisor or a panel |
+| were the 737 answered? | **729 no reply, 8 answered** — the panel drops a frame whose length field is wrong |
+| do the "classes" partition by host? | no. **One host emits all four** of `0x2E`, `0x2F`, `0x33`, `0x34` |
 
-**Second-channel session establishment.** Session establishment is not a distinct opcode or message
-class — it rides the second channel as the `0x4640` (`EBLN_PING` / IdentifyBlock, §7) identity
-exchange. When the source identity in `slot[3]` matches a node already in the receiver's peer list,
-the receiver replies with a distinct, short (~48-byte) second-channel response that is effectively an
-**outbound peer offer** back to the peer — different from the passive ~91-byte `0x33` DATA-dialect
-response returned to a freshly-accepted (wildcard) identity. [W] Critically, this second-channel identity path accepts an arbitrary `slot[3]` identity (it
-is not bound by the data-service identity-length gate of §7); empirically it has accepted identities
-at lengths 10 and 15. [W]
+#### 6.2.3 What the six "classes" actually were
 
-**`0x2F` is the modern counterpart to `0x2E` — a per-panel-platform pair, not a direction.**
-`0x2F` is to `0x2E` exactly what `0x34` is to `0x33`: the **modern-platform** form of the second
-channel. The choice between the pair is fixed by the panel's firmware generation (§6.6), **not** by
-traffic direction — a legacy panel uses `0x2E` in *both* directions (supervisor→panel and
-panel→supervisor) and a modern panel uses `0x2F` in both. An earlier reading that mapped `0x2E` to the
-supervisor→panel direction and `0x2F` to the panel→supervisor direction was an artifact of a small
-capture in which the one modern panel happened to be the main reverse-pushing node; a three-hour
-fleet capture shows the split tracks the panel, not the direction. [W] A client that does not
-originate peer-to-peer connect offers need not emit `0x2F`, but MUST accept and correlate inbound
-`0x2F` frames by sequence, and MUST emit the pair member that matches the peer's generation. [W]
+Resolving each value into the slot lengths that produce it: [W]
 
-**Connection modes.** The second-channel class chosen for a connection follows the panel generation;
-within that, two usage patterns appear, by whether the carrier hands off to the data class:
+| old name | value | slot name lengths | what it really is |
+|---|---:|---|---|
+| session carrier | `0x29` | 7+5+7+5 | a 5-character node in the peer slot |
+| peer-session carrier | `0x2A` | 7+6+7+5 | …the same, with a **6**-character node |
+| second channel, legacy | `0x2E` | 7+10+7+5 | a **10**-character name in the peer slot |
+| second channel, modern | `0x2F` | 7+10+7+6 | …the same, with a 6-character node |
+| DATA, legacy dialect | `0x33` | 7+15+7+5 | a **15**-character name in the peer slot |
+| DATA, modern dialect | `0x34` | 7+15+7+6 | …the same, with a 6-character node |
 
-| Mode | Carrier (second-channel) class | Data class | Applies to | Tag |
-|---|---|---|---|---|
-| Legacy | `0x2E` | `0x33` | older-firmware panels | [W] |
-| Modern | `0x2F` | `0x34` | newer-firmware panels | [W] |
-| Single-type carrier | `0x2E` or `0x2F` (every frame stays on the carrier class) | — | schedule/program edits and alarm bursts, on either generation | [W] |
+Read down the table and the model evaporates:
 
-In the first two rows the carrier class establishes/keepalives the session (via `0x4640`) and carries
-the panel→supervisor announce + DB-change records, while operational reads/writes ride the matching
-data class; in the single-type-carrier pattern a whole transaction (e.g. a schedule edit or an alarm
-burst) stays on the carrier class start to finish. A parser distinguishes a session-establishment
-frame from an operational frame by inspecting the two bytes after the routing slots on a `dir == 0x00`
-frame: if they equal `0x4640`, the frame is a session establish/keepalive; otherwise they are an
-ordinary opcode. [W]
+- **Every "modern dialect" is its "legacy" partner plus one**, in all three
+  pairs, and the +1 is one node name one character longer. At this site the
+  panels are numbered — the single-digit ones have five-character names and the
+  double-digit ones have six. **"Legacy versus modern firmware" was
+  single-digit versus double-digit node numbering.**
+- **"Data" versus "second channel" is the same supervisor writing its own name
+  two different ways** — with and without the `|<port>` suffix, 15 characters
+  against 10. §5.3.6 already recorded that the supervisor presents its identity
+  "in both plain and `<name>|<port>` form"; nothing connected the two.
+- The **BLN name occupies slots 0 and 2** in every frame, which is why the
+  first and third lengths never move at a single site.
+
+#### 6.2.4 Why it survived, which matters more than the error
+
+Four things kept it alive, and each is worth recognising elsewhere.
+
+**It really is constant per connection.** 11,488 of 11,529 TCP connections carry
+exactly one value, because a connection is between one supervisor and one panel
+and the four slot names do not change. Every stability check passed. The 41
+exceptions are almost all this project's own scanner probing `0x33` then `0x34`
+with *identical* slot names — visible in the captures as the same four names
+either side of the change.
+
+**The confirmations could not fail.** "Each panel used exactly one dialect for
+its lifetime in the capture" and "263 of 263 peer pairs use exactly one data
+class" are both *trivially* true once the field is a name-length sum. A test
+whose failure is impossible is not a test.
+
+**The anomaly was in hand and was explained away.** §7.3.1 recorded 34 peer
+pairs "mixing the two dialects" and attributed them to our own scanner probing
+both. That was right about the frames and wrong about the cause.
+
+**The one-panel fleet study.** §6.6 reported nine panels on identical hardware,
+eight on an older firmware build speaking "legacy" and one on a newer build
+speaking "modern" — offered as the demonstration that dialect tracks firmware
+generation. It rested on **one panel**, whose name is one character longer than
+its eight siblings'. A correlation of n=1 was tagged `[W]` and turned into a
+protocol rule.
+
+#### 6.2.5 What survives
+
+The label was wrong; several of the observations under it were not, and they
+belong to the peers and opcodes that produce them rather than to a class byte:
+
+- The **identity exchange** (`0x4640 EBLN_PING`, §9.6) and the DB-change,
+  replication and alarm-print traffic are real. They are selected by **opcode**,
+  and they happen to be what the peer with the 10-character name does.
+- The **second TCP connection** is real and is observable as a second
+  connection. It is not identified by `msg_type`.
+- The **traffic profile** is real as a per-peer profile.
+- The `RAD-50` versus ASCII **string-encoding** question (§8.4, §3.3.2) is a
+  genuine per-firmware-revision property and is untouched by this — it was
+  bundled into the "dialect" record and is now stated on its own.
+
+#### 6.2.6 What an implementer must do
+
+**Compute the field. Do not choose it.** Build the four slots, sum their bytes,
+add 13, and write that. There is no dialect to detect, no candidate set to
+probe, and no need to fingerprint the peer's firmware before framing a request.
+
+The failure mode if you get it wrong is the worst kind: **the panel does not
+answer and does not complain.** 729 of the 737 wrongly-framed frames in this
+corpus drew no reply at all. Anyone who read the previous edition of this
+section and hard-coded `0x33` would see a panel that "does not support" whatever
+they asked, when in fact the frame was discarded before the opcode was read.
+
+*This correction came from a reader who ran the published dissector against his
+own site, saw a value the table did not list, and worked out what it was. The
+corpus here contains one site; his did not. It is the clearest argument possible
+for putting protocol work in the open, and for treating a single deployment as a
+sample of one.* [W]
 
 ### 6.3 The direction byte
 
@@ -1705,115 +1728,38 @@ freshly-opened TCP connection continues the prior high value, it does not reset 
 normative rule remains **exact echo**: a response carries the request's `sequence` verbatim; match on
 that against the set of outstanding requests on that connection. [W]
 
-### 6.6 Legacy and modern dialect differences
+### 6.6 The "legacy and modern dialect" model, withdrawn
 
-The legacy dialect (`0x33`) and modern dialect (`0x34`) are byte-compatible. For the same operation
-the only required byte difference is the `msg_type` low byte:
+**This section is withdrawn in full.** It described `0x33` and `0x34` as
+byte-compatible legacy and modern dialects, a stable per-peer property fixed by
+the panel's firmware generation, and instructed a client to fingerprint the peer
+via `CABINET_DISPLAY` and select the dialect from the firmware revision.
 
-```
-legacy:  <total_len> 00 00 00 33 <sequence> 00  <slots> <opcode> <body...>
-modern:  <total_len> 00 00 00 34 <sequence> 00  <slots> <opcode> <body...>
-```
+None of that is a thing. `msg_type` is a header length (§6.2): `0x34` is `0x33`
+with one node name one character longer. The nine-panel "fleet study" this
+section rested on — eight panels on an older build speaking legacy, one on a
+newer build speaking modern, on identical hardware — was eight panels with
+five-character names and **one** with a six-character name.
 
-The header layout, four-slot routing, opcode position, direction semantics, TLV grammar, scope tag,
-f32 encoding, and error tail are all identical across the two dialects. The two carry the **same
-operational opcode set and the same value encoding** — a side-by-side check of `COV_ANNUNCIATE`
-payloads on both dialects returns identical big-endian `f32` values; only the `msg_type` low byte
-differs. [W]
+Two things the old section said are true and are kept, restated where they
+belong:
 
-**Dialect is a stable per-peer property fixed by the panel's firmware generation — not a
-per-transaction choice, and not by hardware type.** In a single supervisor capture spanning a
-nine-panel fleet, each panel used exactly **one** dialect pair for its entire lifetime in the capture,
-and the split tracked **firmware generation on identical hardware**: all nine were the same hardware
-platform (a modular-cabinet controller — `PXME` in the firmware identity string), but the eight on an
-older firmware build (a 2013-era revision) spoke **legacy** `0x33` DATA + `0x2E` on their second
-channel, while the one on a newer firmware build (a 2019-era revision) spoke **modern** `0x34` DATA +
-`0x2F` exclusively. [W] The panel's firmware revision string, version, and build date are all readable
-in one round-trip via `CABINET_DISPLAY` (`0x010C`, §10.5), so a client SHOULD **fingerprint the peer
-and select the dialect from its firmware generation** rather than blind-probing. As a fallback when the firmware is unknown, the candidate set is exactly
-`{0x33, 0x34}` (§6.2), legacy first; for **parsing**, the two are interchangeable (a receiver treats
-them identically). Note this legacy↔modern split is a **revision within the proprietary-P2 firmware
-line** (a later 2.x build emits the modern classes) — it is *not* a protocol-family change, and is
-distinct from the separate "P2 vs BACnet firmware" choice the same hardware platform can be ordered
-with (§10.5); a BACnet-firmware unit is not a P2 node at all and does not appear on the P2 BLN. Opcode coverage overlaps but is not identical: most high-volume operations occur in
-both, while certain single-shot and legacy-supervisor operations occur only in the legacy dialect. [W]
+- **The opcode set, TLV grammar, scope tag, `f32` encoding, direction semantics
+  and error tail do not vary with `msg_type`.** Of course they do not; the field
+  is a length. A side-by-side check of `COV_ANNUNCIATE` payloads across values
+  returns identical big-endian floats, which is now an unremarkable result
+  rather than a finding about dialects. [W]
+- **String encoding really is a per-firmware-revision property.** Early
+  (pre-IP) revisions pack names in **RAD-50** — three characters per 16-bit word
+  over the 40-symbol alphabet `" ABCDEFGHIJKLMNOPQRSTUVWXYZ$.?0123456789"`
+  (index 0 = space, 1–26 = A–Z, 27 = `$`, 28 = `.`, 29 = `?`, 30–39 = `0`–`9`),
+  packed as `((c0 × 40) + c1) × 40 + c2`. All P2/IP revisions use plain ASCII in
+  the length-prefixed TLVs and the NUL-terminated slots. This was bundled into
+  the "dialect" record and is independent of it; see §8.4 and §3.3.2. [S]
 
-Implementation note: name/string **encoding** is a per-firmware-revision property, not a per-frame
-one. Early (pre-IP) revisions pack names in **RAD-50** — three characters per 16-bit word over the
-40-symbol alphabet `" ABCDEFGHIJKLMNOPQRSTUVWXYZ$.?0123456789"` (index 0 = space, 1–26 = A–Z, 27 =
-`$`, 28 = `.`, 29 = `?`, 30–39 = `0`–`9`), packed as `((c0 × 40) + c1) × 40 + c2`. [S] All P2/IP
-revisions use plain ASCII in the length-prefixed TLVs and NUL-terminated slots. A node uses one
-string encoding for its whole revision; the firmware/platform identity selects the encoding (the
-vendor's per-platform `STRING_TYPE` = RAD50 or ASCII). A peer presenting RAD-50-packed names is a
-pre-IP revision, out of scope for a TCP/5033 ASCII implementation. [S][D]
-
-**The per-peer capability model — how one client speaks to every panel generation.** Dialect and
-encoding are not negotiated on the wire; there is no capability handshake, no version byte exchanged
-per transaction, no feature bits. Instead the encoding and dialect are **learned once per peer, at
-connect, from the peer's firmware revision**, and then applied statically for the life of the session.
-A conformant multi-generation client (this is exactly how a supervisor talks to a mixed fleet) keeps a
-small per-peer record — `{ device generation, string encoding, message-class dialect }` — and fills it
-in the first time it reaches a peer:
-
-1. **Learn.** Read the peer's firmware revision once at connect — `CABINET_DISPLAY` (`0x010C`, §10.5)
-   returns the revision string, version, build date, and platform in a single empty-request round-trip
-   (a pre-IP serial peer is identified by its revision-table entry instead). The revision string is the
-   the single defining input. [W]
-2. **Classify.** Map the revision to a **device generation**, which is purely a function of the
-   revision value: a **field-bus (FLN/P1) device**, a **modern APOGEE Ethernet panel** (revision at or
-   above the APOGEE threshold), a **legacy / pre-APOGEE panel** (revision below it), a **LON-integrated
-   panel**, or a **BACnet-firmware unit** (which is not a P2 node at all and never appears on the P2
-   BLN, §10.5). This classification is the same one the field's own supervisor makes, and it is
-   derivable entirely from the observable revision — no probing required. [S][I]
-3. **Select encoding.** The generation selects the string encoding — pre-IP revisions = **RAD-50**, all
-   IP/APOGEE revisions = **ASCII** (above) — via the vendor's per-revision `STRING_TYPE`. [S][D]
-4. **Select dialect.** The generation selects the message-class dialect — **modern `0x34`/`0x2F`** for
-   the newer-firmware generation, **legacy `0x33`/`0x2E`** otherwise (§6.2). The selector reduces to a
-   single bit driven by the stored per-peer generation, not by anything on the wire. **Measured across
-   the corpus, and it holds:** [W]
-
-   | | pairs | mixing the two dialects |
-   |---|---:|---:|
-   | source→destination pairs carrying a data dialect | 762 | **34** |
-   | …carrying a second-channel frame | 362 | **0** |
-   | …carrying a peer carrier `0x29`/`0x2A` | 857 | **0** |
-
-   The 34 are not counter-examples. **Twenty-nine mix by exactly one frame**, the
-   rest by two to five, and the largest — eighteen — is in a capture named for a
-   supervisor enumeration test: they are our own scanner probing both dialects,
-   not a peer alternating. **728 of 762 pairs never mix at all.**
-
-   The generations also agree between the two channels: of the nodes emitting
-   exactly one data dialect and exactly one second-channel class, **263 of 263**
-   pair `0x33` with `0x2E` and `0x34` with `0x2F`, with **zero** disagreements.
-
-   Note the unit. A *node* may well emit both `0x33` and `0x34` — 34 of 461
-   sources do — because a supervisor speaking to a mixed fleet uses each peer's
-   dialect. Group by the **pair**, never by the sender, or the mixed-fleet
-   supervisor looks like a protocol violation. [W]
-5. **Cache and reuse.** A client may store the record against the peer and reuse it for every
-   subsequent frame: the dialect itself is stable per peer for as long as any connection to it lasts
-   (item 4). What a client must **not** assume is that the identity block behind it is read once.
-   The observed supervisor **re-reads `CABINET_DISPLAY` on a fixed timer** — measured per peer across
-   the corpus, successive reads to the same peer fall in two tight populations, **30.006 s**
-   (σ 0.0043 s, n=82 intervals over 7 peers) and **≈3600.4 s** (n=33 over 10 peers), with one peer
-   showing both. All 115 of those intervals are **within a single live connection**, so neither is a
-   reconnect artifact, and only 13 of the 115 connections carrying an `0x010C` open with one — it is
-   a poll, not a session handshake. Whether the supervisor is refreshing its dialect record or merely
-   using the same opcode for periodic health is not observable from the wire; what is observable is
-   that a peer must expect the identity block to be re-read on a schedule regardless of whether
-   anything about it has changed. [W]
-
-   (§5.0's cadence table measures the same opcode **per connection** and reports 30.01 s over 102
-   intervals; this measurement is **per peer**, which is a different denominator, and it is what
-   exposes the hourly population — an hourly peer contributes few intra-connection intervals.
-   The two figures agree where they overlap; neither corrects the other.)
-
-The practical consequence for an implementer: you do **not** blind-probe `{0x33, 0x34}` or guess the
-encoding. You issue one `CABINET_DISPLAY`, classify the generation from the returned revision, and from
-that one read you know both how to encode names (RAD-50 vs ASCII) and which dialect to frame in — for
-that peer, permanently. This learned-once-per-peer record is the entire mechanism behind "it just works
-with every controller on the BLN." [W][S][I]
+`CABINET_DISPLAY` (`0x010C`, §10.5) remains the right way to learn a peer's
+firmware revision, hardware platform and identity in one round trip. It is
+simply not needed in order to frame a request.
 
 ### 6.7 Segmentation
 
@@ -1873,8 +1819,8 @@ still unpinned — no single record that large was captured; every large result
 was continued by cursor instead. [S][OPEN]
 
 **Do not read the Ethernet MTU as the boundary.** A P2 frame is not capped near
-1,514 bytes: **128 frames in the corpus exceed it**, running to 1,622, in both
-dialects and across five captures, each one arithmetically exact
+1,514 bytes: **128 frames in the corpus exceed it**, running to 1,622, across
+five captures, each one arithmetically exact
 (`13 + slots + body = total_len`). 122 of the 128 are responses and 6 are
 `0x4636` replication requests. So a P2 frame routinely spans more than one
 Ethernet segment and a receiver *must* reassemble across TCP segment boundaries
@@ -2395,15 +2341,19 @@ sections. This is the whole sequence, from TCP connect to steady state. [W][S]
 4. **A correct BLN name is admitted, and the reply tells you which kind of
    peer you are.** A `slot[3]` identity already in the receiver's peer list draws
    a short (~48-byte) second-channel response — effectively a peer offer back.
-   A novel identity draws the longer data-dialect response *and writes a
-   Permanent node-table entry at your IP* (§5.3.3, §6.2). Registration is gated
-   by BLN-correctness, not by being served data: the data-service identity check
-   is a separate, later gate.
+   A novel identity draws the longer response *and writes a Permanent
+   node-table entry at your IP* (§5.3.3). Registration is gated by
+   BLN-correctness, not by being served data: the data-service identity check is
+   a separate, later gate.
 
-5. **Learn the peer's generation once, then stop guessing.** Issue
-   `CABINET_DISPLAY` (`0x010C`, §10.5) and classify from the returned revision.
-   That one read fixes both the dialect to frame in and how names are encoded
-   for that peer, permanently (§6.6). Do not blind-probe `{0x33, 0x34}`.
+5. **Compute `msg_type` from your own slots.** It is `13 + the total bytes of
+   the four routing slots` (§6.2) and changes whenever the names do. Earlier
+   editions told a client to read the peer's firmware and *select a dialect*
+   from it, and to fall back to probing `{0x33, 0x34}`. Both instructions are
+   withdrawn: there is nothing to select and nothing to probe, and a wrong value
+   is discarded without a reply. Reading `CABINET_DISPLAY` (`0x010C`, §10.5)
+   once per peer is still worth doing — it fixes **how names are encoded**
+   (ASCII vs RAD-50, §8.4) and identifies the platform — but not how to frame.
 
    > You do **not** need to decode the whole block to do this. `revstring` is
    > **field 1** — the first `TEXT_` TLV in the body — so the generation is
@@ -4452,16 +4402,16 @@ changing panel state and left alone.
 
 The corpus distribution grounds the catalog in observed behavior:
 
-- **Message classes (`msg_type` low byte).** Six classes are defined — the legacy/modern pairs of §6.2/§6.6 — and any other low-byte value is parser noise from a desynced stream. Corpus distribution, over **621,268 trusted frames in 121 distinct P2-carrying captures** (content-deduplicated; criteria stated because an earlier edition of this table gave counts that cannot be reproduced from the evidence base, see the note below):
+- **`msg_type` values.** Six distinct values occur in this corpus. They are **not** classes: `msg_type` is `13 + the total bytes of the four routing slots` (§6.2), so a value is a *sum of node-name lengths* and the six reflect this site's naming, not a protocol taxonomy. Another site produces other values. The census is kept because the frame counts are real, with the old role names struck through; any low-byte value outside the set below is parser noise from a desynced stream. Corpus distribution, over **621,268 trusted frames in 121 distinct P2-carrying captures** (content-deduplicated; criteria stated because an earlier edition of this table gave counts that cannot be reproduced from the evidence base, see the note below):
 
-  | Class | Role | Frames |
-  |---|---|---:|
-  | `0x33` | legacy data dialect | 420,024 |
-  | `0x29` | session carrier (panel-to-panel) | 100,200 |
-  | `0x34` | modern data dialect | 40,962 |
-  | `0x2E` | legacy 2nd-channel / announce + DB-sync | 42,542 |
-  | `0x2A` | peer-session carrier (panel-to-panel) | 12,556 |
-  | `0x2F` | modern 2nd-channel | 4,984 |
+  | Value | = 13 + slot bytes | slot name lengths | Frames |
+  |---|---|---|---:|
+  | `0x33` | 51 | 7+15+7+5 | 420,024 |
+  | `0x29` | 41 | 7+5+7+5 | 100,200 |
+  | `0x2E` | 46 | 7+10+7+5 | 42,542 |
+  | `0x34` | 52 | 7+15+7+6 | 40,962 |
+  | `0x2A` | 42 | 7+6+7+5 | 12,556 |
+  | `0x2F` | 47 | 7+10+7+6 | 4,984 |
 
   These sum to the 621,268 trusted frames of 9.5. **The peer carriers moved
   by four orders of magnitude when panel-side captures entered the corpus**
@@ -4483,7 +4433,7 @@ The corpus distribution grounds the catalog in observed behavior:
   | `0x29` | 13 | every pair among the other nodes |
   | `0x2A` | 2 | both involve the *same single node*, which never appears on `0x29` |
 
-  Two independent panels each speak `0x29` to every peer they have **and `0x2A` to that one node**. A single vantage could not distinguish this from "one link happens to differ"; two vantages on two devices make it a per-node property. The natural reading is a firmware-generation split — one node on the BLN speaks the other dialect of the pair, and its peers switch carrier to match it. An implementer should therefore select the peer carrier **per peer**, from what that peer presents, and must not assume one carrier BLN-wide. Which of the two is the newer generation is **[OPEN]**: it needs `0x010C CABINET_DISPLAY` read from the odd node. [W]
+  Two independent panels each speak `0x29` to every peer they have **and `0x2A` to that one node**. A single vantage could not distinguish this from "one link happens to differ"; two vantages on two devices make it a per-node property. The deduction "per-node property" was right and the identification was wrong: the property is the **length of that node's name** (§6.2). One node on this BLN has a six-character name where its peers have five, so every frame addressed to it sums one higher. An implementer should therefore select the peer carrier **per peer**, from what that peer presents, and must not assume one carrier BLN-wide. Which of the two is the newer generation is **[OPEN]**: it needs `0x010C CABINET_DISPLAY` read from the odd node. [W]
 
   > **Why the numbers changed.** A previous edition of this list gave 433,425 / 43,668 / 43,780 / 7,322 / 2,200 / 296, totalling 530,691 frames. That total is reproducible from neither the deduplicated corpus (621,268) nor a naive count over all 764 capture files including duplicates (1,326,186), and both counts put `0x2A` at zero in the supervisor-side set. The likeliest explanation is now a mundane one: the corpus has since been shown to have been **incomplete** — thirty-four captures, 271,636 frames, were recovered into it after this note was first written — so an earlier edition counting a capture set that no longer existed in the evidence tree is exactly what one would expect. The figures here are replaced with counts reproducible from the current corpus under the stated criteria, and a reader who reproduces them should expect them to move again if the corpus grows. [W]
 - **Direction byte.** 0x00 request/push (314,273), 0x01 success response (300,989), 0x05 error response (6,006) - summing exactly to the 621,268 trusted frames of 9.5. A success response carries the operation's payload after the routing slots; an error response carries exactly a 2-byte error code and nothing else. [W]
@@ -6056,19 +6006,27 @@ Sub-types referenced: `IP_Address_Settings { dhcp, dns, nrOfapp_ports:u16, app_p
 
 The leading three TLVs (revstring / firmwaretype / linktime) and the trailing node/site/BLN TLVs followed by the IP/MII/MAC/BACnet settings match the struct field order one-for-one. [W]
 
-**Fleet fingerprinting — and it predicts the wire dialect.** The banner's first three TLVs are a
+**Fleet fingerprinting.** The banner's first three TLVs are a
 **firmware revision string** (e.g. `PME1252`, `PME1300` — firmware-build identifiers, *not* hardware
 model numbers), a **hardware-platform + firmware-version string** (e.g. `PXME V2.8.10 APOGEE`, where
 `PXME` is the modular-cabinet platform code and `V2.8.10` the firmware version), and the **build date**.
 Because the request body is empty and the response carries all of this plus identity in one round-trip,
 `0x010C` is the canonical way to inventory a BLN: issue it to each known node and read back the firmware
 generation. Across a nine-panel fleet — **all the same hardware platform** — the split was purely by
-firmware: eight on a 2013-era revision (`V2.8.10`) and one on a 2019-era revision (`V2.8.18`). **That
-split is exactly the legacy/modern message-class split (§6.2/§6.6):** the older-firmware panels speak
-legacy `0x33`/`0x2E`, the newer-firmware panel speaks modern `0x34`/`0x2F`. So a client can read a
-panel's firmware generation from `0x010C` and **select the correct dialect before sending any
-data-class frame**, rather than blind-probing `{0x33, 0x34}`. The build date / version string is the
-reliable generation discriminator. [W]
+firmware: eight on a 2013-era revision (`V2.8.10`) and one on a 2019-era revision (`V2.8.18`). That
+part stands. [W]
+
+**What does not stand, and it was published here for three editions.** This
+paragraph used to continue: *"That split is exactly the legacy/modern
+message-class split — so a client can read a panel's firmware generation from
+`0x010C` and select the correct dialect before sending any data-class frame."*
+The two splits coincide at this site for a reason that has nothing to do with
+firmware: the eight older panels have **five-character** names and the newer one
+has a **six-character** name, and `msg_type` is `13 + the total bytes of the
+four routing slots` (§6.2). Eight-against-one is also n=1 — a single panel
+carrying a whole protocol rule. `0x010C` remains the right way to inventory a
+BLN and to learn each peer's **string encoding**; it says nothing about how to
+frame. [W]
 
 > **Reading the hardware model (informative).** These modular panels carry a printed model such as
 > `PXC100-PE96.A` (Siemens APOGEE part number; per the public *PXC Modular Series* datasheet, "PXC
@@ -8139,8 +8097,11 @@ The `DBCHANGE_*` family is not a change *feed*. It carries no payload at all.
 
 Across the corpus, **ten distinct `DBCHANGE_*` opcodes are wire-observed, 93
 requests in total, and every single one has a zero-length body**. Every one is
-answered with a success. Every one rides the **second channel** (`0x2E`, and
-`0x2F` in the modern dialect) — never the data dialect. [W]
+answered with a success. Every one carries `msg_type` `0x2E` or `0x2F` — which,
+`msg_type` being a header length (§6.2), means every one was framed with the
+**ten-character form of the supervisor's name** in the peer slot rather than the
+fifteen-character `<name>|<port>` form. That is a fact about which identity emits
+these notifications, not about a channel. [W]
 
 | Opcode | Section | Requests | Body |
 |---|---|---:|---|

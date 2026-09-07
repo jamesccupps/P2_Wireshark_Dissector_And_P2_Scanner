@@ -1904,16 +1904,13 @@ local resp_op = {}
 --   data channel:    0x33 legacy / 0x34 modern  (same opcodes + same f32 encoding)
 --   2nd channel:     0x2E legacy / 0x2F modern  (identity + DB-change/replication records + alarm prints)
 --   peer (mirror-only): 0x29 / 0x2A session carriers; both dominated by EBLN_PING
-local MSG_CLASS = {
-  [0x33]="data (legacy panel)", [0x34]="data (modern panel)",
-  -- Labels follow PROTOCOL.md §6.2. 0x29 is the low-volume session carrier seen
-  -- only at connection start at low sequence numbers; 0x2A is the peer-to-peer
-  -- (panel<->panel) session carrier. Both carry the EBLN_PING 0x4640 identity
-  -- exchange. Earlier labels ("maintenance" / "COV-subscribe") asserted a
-  -- function the corpus does not establish.
-  [0x29]="session carrier", [0x2A]="peer-session carrier (panel<->panel)",
-  [0x2E]="2nd channel (legacy: announce/DB-sync)", [0x2F]="2nd channel (modern: announce/DB-sync)",
-}
+-- There is no MSG_CLASS table any more, and there is no set of valid values.
+-- The u32 at offset 4 is a HEADER LENGTH: 13 + the total bytes of the four
+-- NUL-terminated routing slots (PROTOCOL.md §6.2). Earlier releases of this
+-- dissector labelled it "Message Class" and named six values as legacy/modern
+-- "dialect" pairs; those six are simply what one site's node names summed to,
+-- and a reader running this dissector elsewhere saw `Unknown (0x32)` -- which
+-- is how the mistake was found. Any value is valid if it matches the slots.
 local DIR = { [0x00]="request / push", [0x01]="success response", [0x05]="error response" }
 local ERRORS = {
   [0x0001]="no_memory_available",
@@ -3063,8 +3060,9 @@ local OPSCHEMA = {
 ------------------------------------------------------------------------ fields
 local f = {}
 f.total_len = ProtoField.uint32("p2.total_len","Total Length",base.DEC)
-f.msg_type  = ProtoField.uint32("p2.msg_type","Message Type (raw)",base.HEX)
-f.msg_class = ProtoField.uint8 ("p2.msg_class","Message Class",base.HEX,MSG_CLASS)
+f.msg_type  = ProtoField.uint32("p2.msg_type","Header Length (13 + slot bytes)",base.DEC)
+f.hdr_calc  = ProtoField.uint32("p2.hdr_len_calc","Header Length (computed from slots)",base.DEC)
+f.hdr_bad   = ProtoField.string("p2.hdr_len_mismatch","Header Length MISMATCH")
 f.seq       = ProtoField.uint32("p2.seq","Sequence",base.DEC)
 f.dir       = ProtoField.uint8 ("p2.dir","Direction",base.HEX,DIR)
 f.bln1      = ProtoField.string("p2.bln1","BLN Name (slot 0)")
@@ -3148,7 +3146,7 @@ f.fw_build  = ProtoField.string("p2.fw.build","Firmware Build Date")
 f.eu        = ProtoField.string("p2.eu","Engineering Units")
 f.body      = ProtoField.bytes ("p2.body","Body")
 p2.fields = {
-  f.total_len,f.msg_type,f.msg_class,f.seq,f.dir,f.bln1,f.dst,f.bln2,f.src,
+  f.total_len,f.msg_type,f.hdr_calc,f.hdr_bad,f.seq,f.dir,f.bln1,f.dst,f.bln2,f.src,
   f.opcode,f.err,f.schema,f.operand,f.tlv,f.scope,f.priority,f.value,
   f.access,f.ems_code,f.ems_user,f.ems_desc,f.date,f.modept,f.setpoint,f.lvl_off,f.lvl_pri,f.lvl_cat,f.lvl_msg,
   f.eqs_mode,f.eqs_val,f.eqs_time,f.rec_index,
@@ -3565,16 +3563,25 @@ local VALUE_RESP = {
 ------------------------------------------------------------------------ one PDU
 local function dissect_one(tvb, pinfo, tree)
   local total = tvb(0,4):uint()
-  local mclass = tvb(7,1):uint()
+  local hdrlen = tvb(4,4):uint()
   local dir = tvb(12,1):uint()
   local st = tree:add(p2, tvb(0,total), "Siemens P2")
-  st:add(f.total_len, tvb(0,4)); st:add(f.msg_type, tvb(4,4)); st:add(f.msg_class, tvb(7,1))
+  st:add(f.total_len, tvb(0,4)); st:add(f.msg_type, tvb(4,4))
   st:add(f.seq, tvb(8,4)); st:add(f.dir, tvb(12,1))
   local off = 13
   local sfields = { f.bln1, f.dst, f.bln2, f.src }; local slots = {}
   for s = 1, 4 do
     local val, adv = cstr(tvb, off); if not val then break end
     st:add(sfields[s], tvb(off, adv-1), val); slots[s] = val; off = off + adv
+  end
+  -- The header length is redundant with the slots, so check it. The panel does:
+  -- a frame whose value does not match its own slots is discarded without a
+  -- reply, which is the hardest failure to diagnose from the sending side.
+  st:add(f.hdr_calc, tvb(4,4), off):set_generated()
+  if hdrlen ~= off then
+    st:add(f.hdr_bad, tvb(4,4),
+           string.format("wire says %d, slots give %d (13 + %d) -- a panel drops this",
+                         hdrlen, off, off - 13)):set_generated()
   end
   -- seq-state key: per TCP stream + the (echoed) sequence number
   local seq = tvb(8,4):uint()
@@ -3644,9 +3651,9 @@ local function dissect_one(tvb, pinfo, tree)
       st:add(f.resp_op, tvb(0,0), rlabel(rop)):set_generated()   -- 0-byte ACK (e.g. write)
     end
   end
-  local cls = MSG_CLASS[mclass] or string.format("0x%02X", mclass)
+  local cls = (hdrlen == off) and "" or string.format("[hdrlen %d/=%d] ", hdrlen, off)
   local who = (slots[4] or "?").."->"..(slots[2] or "?")
-  if dir == 0x00 then pinfo.cols.info:set(cls.."  "..(opname or "?").."  "..who)
+  if dir == 0x00 then pinfo.cols.info:set(cls..(opname or "?").."  "..who)
   elseif dir == 0x05 then
     -- Guard on off+2, not total>=2. The error tail lives after the four routing
     -- slots; on a truncated frame whose slots run to the end there is no tail,

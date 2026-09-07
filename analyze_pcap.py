@@ -197,17 +197,14 @@ KNOWN_ERRORS = {
     0x0E17: "fln_application_invalid_for_device (E3607)",
 }
 
-MSG_TYPES = {
-    # APOGEE_P2_SPEC.md §5.1 / §11: 0x33 vs 0x34 distinguishes
-    # firmware dialect, NOT data-vs-keepalive. Legacy panels carry
-    # operational traffic in 0x33 DATA; modern panels carry it in
-    # 0x34 HEARTBEAT. Both opcodes and routing format are identical;
-    # only the msg-type byte differs.
-    0x2E: "CONNECT",
-    0x2F: "ANNOUNCE",
-    0x33: "DATA (legacy dialect)",
-    0x34: "HEARTBEAT (modern dialect)",
-}
+# There is no message-type table. The u32 at offset 4 is a HEADER LENGTH --
+# 13 + the total bytes of the four NUL-terminated routing slots
+# (PROTOCOL.md 6.2) -- so its value is a sum of node-name lengths and varies by
+# site. This dict used to name 0x2E/0x2F/0x33/0x34 as CONNECT / ANNOUNCE and
+# legacy / modern "dialects"; those are the four values one site's names
+# produced. A census of them is a census of that site's naming, which is worth
+# printing as such and worth checking against the slots.
+MSG_TYPES = {}
 
 DIR_BYTES = {0x00: "Request", 0x01: "Success", 0x05: "Error"}
 
@@ -425,10 +422,10 @@ def main():
 
     # ─── Output ─────────────────────────────────────────────────────────────
     print("=" * 70)
-    print(" MESSAGE TYPES")
+    print(" HEADER LENGTHS (msg_type = 13 + slot bytes, PROTOCOL.md 6.2)")
     print("=" * 70)
     for mt, cnt in msg_types.most_common():
-        print(f"  0x{mt:02X} ({MSG_TYPES.get(mt, '?'):<20s}) {cnt:>8d}")
+        print(f"  {mt:>5d} (= 13 + {mt - 13:>3d} slot bytes) {cnt:>8d}")
 
     print("\n" + "=" * 70)
     print(" REQUEST OPCODES (dir=0x00)")
