@@ -7332,6 +7332,72 @@ suggestive split and it is not evidence of pairing; no stem carries both. [W]
 > all 60 occurrences. When a measurement contradicts a standing claim, the first
 > suspect is the measurement's own field selection.
 
+### 11.7 How a P2 point and a BACnet object are joined
+
+§11.6 shows the two names. This is the structure that carries both identities at
+once, and it is declared in the type system rather than inferred from traffic.
+
+**One operation creates a point in both name spaces.** The
+`AP2_BAC_Point_Add_<LTYPE>` family — twelve typed variants — has a request body
+of the form: [S]
+
+```
+bac_data_revision                    BACnet-side revision
+bac_data_size                        BACnet-side size
+bac_props_common : BAC_Props_Common  the BACnet property set
+bac_point_base   : BAC_Point_Base    the BACnet OBJECT (tag = ASHRAE object type, §10.4.6)
+point_base       : Point_base        the P2 point base
+<ltype>          : lai_ / ldo_ / …   the P2 type-specific arm
+lenum_address, user_profile, point_extension2
+```
+
+The BACnet object and the P2 point are **fields of the same body**. That is the
+join: not a mapping table the supervisor maintains, but a single record that
+declares a point twice.
+
+**Twelve of the sixteen P2 point types have a typed form.** [S]
+
+| | |
+|---|---|
+| typed BACnet add exists | `LAI` `LAO` `LDI` `LDO` `L2SL` `L2SP` `LOOAL` `LOOAP` `LENUM` `LFSSL` `LFSSP` `LPACI` |
+| **no typed form** | `LDAO` `LFMSL` `LFMSP` `PPCL_LAI` |
+
+The four omissions read sensibly rather than arbitrarily: `PPCL_LAI` is a
+program-resident calculated value with no physical termination to expose, and
+the other three are specialised output and multi-speed types. A generic
+`AP2_BAC_Point_Add_Request` also exists, taking `point : All_points` instead of
+a fixed arm, so the twelve typed forms are a convenience over a general one
+rather than the whole capability. Whether a panel accepts the generic form for
+the four is not established here. **[OPEN]**
+
+**The property sets are ASHRAE's, one per object type.** Nine `BAC_Props_*`
+structures map one-for-one onto `BAC_Point_Base`'s nine arms, over three shared
+bases: [S]
+
+| base | property set for | carries |
+|---|---|---|
+| `BAC_Props_Common_Analog` | AI, AO, AV | `present_value`, `units`, `cov_increment`, `alarm_info` |
+| `BAC_Props_Common_Binary` | BI, BO, BV | `present_value`, `inactive_text`, `active_text`, `change_of_state_time`, `change_of_state_count`, `elapsed_active_time`, … |
+| `BAC_Props_Common_Multi` | MI, MO, MV | `present_value`, `number_of_states`, `state_text` |
+| `BAC_Props_Common` | all | `object_identifier`, `object_name`, `object_type`, `description`, `status_flags`, `event_state`, `reliability`, `out_of_service`, `alarm_info`, `profile_name` |
+
+Every one of those names is a standard ASHRAE 135 property, as are the
+type-specific additions — `polarity` and `minimum_on_time` / `minimum_off_time`
+on the binary outputs, `priority_array` and `relinquish_default` on every
+commandable type, `min_pres_value` / `max_pres_value` / `resolution` on the
+analogs. **This is a second, independent check on §10.4.6's tag map**, which was
+recovered from the vendor's codec and validated against ASHRAE's object-type
+numbering: the arms carry the properties ASHRAE assigns to exactly those object
+types.
+
+**What this says about scope.** §3.2.4 places the BACnet stack out of scope and
+that stands — none of this is needed to speak P2. But the boundary is not where
+it might appear: these are **P2 operations**, in the P2 opcode space, with P2
+bodies, and a client enumerating a panel will meet them. They are documented
+here so a reader can recognise and skip them, not so a reader can implement
+BACnet. [S]
+
+
 ## 12. Change-of-Value (COV)
 
 COV is the mechanism by which a panel reports a point's value change to interested peers without being polled. It is a **subscription** service: a peer enables COV on points it cares about, the panel thereafter pushes a report (`COV_ANNUNCIATE`) whenever a subscribed point changes by at least its COV resolution, and the peer disables or deletes the subscription when done. COV is the highest-volume P2 operation in steady state. [W]
