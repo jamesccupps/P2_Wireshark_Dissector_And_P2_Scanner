@@ -2921,6 +2921,17 @@ either would be ambiguous with a wildcard or with an address. The remaining five
 are presumably further pattern syntax; nothing in this corpus exercises them, so
 that is inference, not observation. [D][W][I]
 
+**A third separator, excluded by a different mechanism.** The colon is not on
+the vendor's blocklist above, and it is not a name character either: it never
+appears inside any of 368 distinct wire `name`/`suffix` values, and it appears
+135 times *between* them in PPCL source text, where `"<name>:<suffix>"` is the
+textual form of the wire's two TLVs (§14.2). It is excluded by the **other**
+mechanism — the vendor permits six delimiters inside a point name (period,
+apostrophe, comma, dash, underscore, space) and the colon is not one of them.
+Two rules therefore govern what a name may contain: an explicit blocklist of
+metacharacters, and an allowlist of delimiters. A character can be barred by
+either, and the colon is barred by the second. [D][W]
+
 **Two consequences for an implementer.** A name you send is not free text —
 strip or reject the seven before putting a caller-supplied string in a name
 slot or a name TLV. And a name you *receive* consisting of exactly `*` is a
@@ -7819,6 +7830,33 @@ Two name-length limits apply, and they are distinct:
 
 - **Legacy 6-character system-name reference limit.** On old firmware revisions a PPCL statement could reference a system point only by a name of up to 6 characters; longer names were truncated for the reference. This is a *firmware-keyed* limit and is separate from — and stricter than — the BLN/node name limits. [D]
 - **15-character node-name limit / 30-character object-name limit.** Current firmware references points by the full logical name (§3.4.2). The 6-character limit is a property of the legacy reference encoder, not of the point name itself. [D]
+
+**A qualified reference joins name and suffix with a colon.** Where a statement
+names a point that has a suffix, the operand appears in PPCL source text as a
+**quoted, colon-joined pair** — `"<name>:<suffix>"` — which is the textual form
+of what the wire carries as *two separate TLVs* (§8.5). Measured over the PPCL
+program text in the corpus: [W]
+
+| | |
+|---|---:|
+| quoted operands in `line_text` | 17 distinct, 158 occurrences |
+| …containing exactly one colon | **15 distinct, 135 occurrences** |
+| distinct left halves that are a **known wire point name** | **10 of 10** |
+| distinct right halves that are a **known wire suffix** | 3 of 4 |
+| wire `name`/`suffix` values containing a colon | **0 of 368** |
+
+The colon is therefore a **separator and never a name character**. A reader
+converting between the two representations splits on it; a reader building a
+name must not emit one. Only 3 of the 15 whole operands correspond to a
+`(name, suffix)` pair this capture also carried on the wire, which is expected —
+a program references points whose values this window never happened to report,
+and says nothing against the syntax.
+
+**What is *not* here.** The `BAC_<device>_<TYPE>_<instance>` crosstrunk
+reference form does not occur anywhere in this corpus — no PPCL line mentions
+`BAC` at all. Cross-trunk *behaviour* is documented at §3.5; the reference
+**syntax** for a cross-trunk point is not established from this evidence.
+**[OPEN]** [W]
 
 `DEFINE` (token `WHOPDEFINE`, §14.3) creates a **macro** — a symbolic alias substituted into later statements at compile time, used to give a readable handle to a point name or a constant. [S]
 
