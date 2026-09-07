@@ -983,13 +983,29 @@ close it off:
 | `0x4640` at 10 s | 99,291 of 99,383 | **378 of 426** |
 | `0x4640` at 60 s | 0 | 0 |
 
-There is no second population in either. `EPing` runs at its **intrasite**
-default of 10 s on every connection and never at the 60 s intersite value, which
-establishes that every peer here is intrasite — and an all-intrasite site should
-then show replication at 30 s, not 60 s. So the disagreement is real and is not
-a site-topology artifact: this is one timer at twice its documented intrasite
-default, uniformly, on 153 connections. What remains open is only whether
-`0x4634` is the opcode that timer governs. [W]
+There is no second population in either. `EPing` runs at 10 s on every
+connection and never at the 60 s intersite value, which points to every peer
+here being intrasite — and an all-intrasite site should then show replication at
+30 s, not 60 s. So the disagreement looks real rather than a site-topology
+artifact: one timer at twice its documented intrasite default, uniformly, on 153
+connections. What remains open is whether `0x4634` is the opcode that timer
+governs. [W]
+
+**One alternative the argument has to dispose of, and cannot.** The vendor's
+integration help documents the supervisor-side **Eping rate** as configurable
+with a **minimum of 10 seconds** (and a maximum of `0xFFFFFFFF`). So 10 s is not
+only the intrasite default — it is also the *floor*, and a site observed at 10 s
+is equally consistent with a supervisor simply configured at the bottom of its
+range. The inference "10 s therefore intrasite" needs the value to be a default
+rather than a limit, and one site at one value cannot tell the two apart. The
+disagreement stands as an observation; the explanation is weaker than the
+earlier wording implied. [D][W]
+
+The same help page gives the other supervisor-side rates and their floors, which
+are worth having next to it: **COV polling rate** minimum 5 s, **Time sync**
+minimum 60 minutes, **Maximum BLN messages** minimum 50. All four share the same
+`0xFFFFFFFF` ceiling, which says they are `u32` seconds/minutes/counts on the
+configuration side. [D]
 
 **Measure per peer connection, not per node.** A node with several peers emits
 one of these per peer, so a per-node aggregate reads far faster than the
@@ -5135,7 +5151,7 @@ The *asserted* values remain unconfirmed from the wire and this corpus cannot se
 | 1 | point_type | Point_type (enum) | L-type (ldi/ldo/lai/lao/l2sl/looap/lpaci/…/lenum) |
 | 2 | nrOfnames | UNSIGNED_16 | count of names |
 | 3 | names | Name_response[] | the point's name(s) |
-| 4 | point_descriptor | Point_descriptor | free-text descriptor |
+| 4 | point_descriptor | Point_descriptor | free-text descriptor. The vendor's integration help caps it at **16 characters**, and the wire agrees without being told to: 567 descriptors observed, lengths 0–16, **29 of them exactly 16 and none longer** — a bound the data touches rather than merely respects. [D][W] |
 | 5 | access_class | Access_class | access-rights class |
 | 6 | out_of_service | BOOLEAN_ | OOS flag |
 | 7 | failed | BOOLEAN_ | comm-failed flag |
