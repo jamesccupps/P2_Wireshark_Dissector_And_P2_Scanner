@@ -6702,6 +6702,34 @@ can walk this body generically", not as "this operation is undocumented", and
 where a section of §10 describes an opcode in prose, that description is the
 authority.
 
+**Two enums are bitmasks, and the wire proves it.** §10.1's caution below warns
+that an enum's members can be **bit positions** rather than values, `Schedule_days`
+being the example. That was read off the declaration. It is now measured, and the
+values are unambiguous: [W]
+
+| value | bits | ×  | reads as |
+|---:|---|---:|---|
+| `62` | `0111110` | **56** | **Mon, Tue, Wed, Thu, Fri** |
+| `127` | `1111111` | 2 | all seven days |
+| `16` | `0010000` | 20 | Thursday |
+| `8` | `0001000` | 2 | Wednesday |
+
+A weekday mask dominating a building's schedules is not a coincidence, and none
+of the four is a declared member value — the enum declares `Sunday` = 0 through
+`Replacement7` = 13, which as *values* would be meaningless here. `Cov_mask`
+behaves the same way: only `0` and `65535` occur, all-clear and all-set, against
+eight declared members that are plainly bit positions. **Read both as masks over
+the declared positions, never as values.** [W][S]
+
+**Two enums carry `255` as a sentinel the declaration does not list.**
+`Cabinet_report_config` declares `reports_to_port0`…`port4` and reads `255` on
+**57 of 60** bodies (with `1` on the other three); `Point_priority` declares 27
+members topping out at 116 and reads `255` once in 2,968. Neither is in range,
+both are `0xFF`, and the obvious reading — *unset / not configured* — is
+consistent with `Cabinet_report_config` being the dominant value on a site that
+routes no cabinet reports. A decoder must not treat an out-of-range enum value
+as corruption. **[OPEN]** on what `255` is formally called. [W]
+
 **Do not guess a width from an enum's value range.** This is the one shortcut
 that looks safe and is not, and it is recorded here because it very nearly went
 into this document as a rule. Twenty-one enum widths had been measured
@@ -7751,7 +7779,7 @@ profile. [D] An earlier revision of this table merged Life Safety and Fire into
 one row, which left five bands against six values and no way to tell which value
 was missing.
 
-The alarm report carries this priority as a 1-byte value (1–6) and may append a 4-character class label (e.g. `URGT`, `MAIN`, `TROB`). [W] The type system's `Alarm_priority_enum` has **seven** members, `priority_0` through `priority_6`, and the extra one reconciles cleanly: the control language's `ALMPRI` function — which reads a point's alarm priority from inside a program — is documented as returning **1 through 6**, the same range the report carries. `priority_0` is therefore the unassigned value, not a seventh severity, and a decoder should render it as "none" rather than inventing a band for it. [D][S] The point's runtime `alarm_state` (§12.3.1) is one of `normal / alarm / high_alarm / low_alarm / trouble`. [S]
+The alarm report carries this priority as a 1-byte value (1–6) and may append a 4-character class label (e.g. `URGT`, `MAIN`, `TROB`). [W] The type system's `Alarm_priority_enum` has **seven** members, `priority_0` through `priority_6`, and the extra one reconciles cleanly: the control language's `ALMPRI` function — which reads a point's alarm priority from inside a program — is documented as returning **1 through 6**, the same range the report carries. `priority_0` is therefore the unassigned value, not a seventh severity, and a decoder should render it as "none" rather than inventing a band for it. [D][S] **The wire splits exactly that way**, which was a prediction of this paragraph before it was a measurement: the *configuration* read-back `0x0983 UPL_ALL_ALARM_MODE` emits **1 through 6 and never 0** (3, 3, 8, 3, 5, 5 occurrences — all six bands in use at this site), while the *runtime* fields that report a point's current state — `0x0274 COV_ANNUNCIATE` and `0x0295 TREND_DATA_DISPLAY` — emit **0 and nothing else**, 1,650 times. A configured band is always 1–6; a point not currently in alarm reports 0. [W] The point's runtime `alarm_state` (§12.3.1) is one of `normal / alarm / high_alarm / low_alarm / trouble`. [S]
 
 ### 13.3 Analog limits, transitions, and deadband
 
