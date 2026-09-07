@@ -409,9 +409,11 @@ node that other nodes subscribe to and command is a peer in the BLN, whatever
 else runs on the same machine.
 
 The point names confirm it. Every write addressed to that port names one of only
-**nine distinct points**, and 97% of those writes carry the **`.BN` / `.BAC`
-name-twin suffixes** — the BACnet-twin convention of §11. The endpoint is
-publishing BACnet-side values into the P2 name space. [W]
+**nine distinct points**, and 97% of those writes name a point carrying a
+**`.BN` or `.BAC` suffix** — the BACnet-side naming of §11.6. The endpoint is
+publishing BACnet-side values into the P2 name space. (An earlier edition called
+these two "name-twin suffixes", pairing them with each other. They are not a
+pair; §11.6 has the measurement.) [W]
 
 Two identifications fit, and the wire does not separate them:
 
@@ -7290,6 +7292,45 @@ Where a P2 point is exposed on a BACnet/IP interface, its logical type maps to a
 | LENUM | MO | MV | [D] |
 
 ---
+
+### 11.6 BACnet-side point names, and what actually twins with what
+
+A P2 point that also exists on the BACnet side of a panel is named with a
+suffix. §3.4 refers to this as the "`.BN` / `.BAC` name-twin" convention; that
+phrasing pairs the two suffixes with each other, and the wire does not.
+
+Measured across **268 distinct point-name strings** in the corpus, counting only
+fields that name a point (`name`, `name_pattern`, `point_name`, `last_name`):
+[W]
+
+| | stems | also present as a **bare** point name |
+|---|---:|---:|
+| `.BAC` | 4 | **4 of 4** |
+| `.BN` | 1 | 0 |
+
+**The twin is bare ↔ `.BAC`.** All four `.BAC` stems also appear without a
+suffix, and both forms carry real traffic rather than one being a stray — the
+four pairs run bare/`.BAC` at 19/7, 9/2, 13/15 and 9/2 occurrences. A point
+therefore has a P2 name and, where it is also exposed to BACnet, the same stem
+with `.BAC` appended, and a client may see either on the wire for what is
+physically one point.
+
+**`.BN` is not the other half of a pair here.** The single `.BN` stem appears 60
+times, always with the suffix, and neither its bare form nor a `.BAC` form is
+ever seen. Whatever `.BN` marks, this corpus shows it standing alone. One stem
+is far too little to say what it means, and it is not said. **[OPEN]**
+
+The two suffixes also arrive by different routes, which is why an earlier
+reading paired them: `.BN` occurs only in `0x0240 POINT_CMD_VALUE` requests — a
+**write** — and `.BAC` only in `0x0274 COV_ANNUNCIATE` — a **read**. That is a
+suggestive split and it is not evidence of pairing; no stem carries both. [W]
+
+> **A method note, because it nearly produced a false retraction.** A first pass
+> counted only fields whose leaf name is literally `name` and found **zero**
+> `.BN` anywhere — which would have contradicted §3.4. The commanded point in a
+> `POINT_CMD_VALUE` request is named in `name_pattern`, so the narrow filter hid
+> all 60 occurrences. When a measurement contradicts a standing claim, the first
+> suspect is the measurement's own field selection.
 
 ## 12. Change-of-Value (COV)
 
