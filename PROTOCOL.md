@@ -10294,6 +10294,14 @@ specific test that would confirm or falsify it.
    `inalarm_by_command`, `program_disabled` and `proofing` are **constant zero** —
    the site's alarms were quiet throughout. Their positions are established; their
    asserted values are not.
+   *Narrowed again:* the **encoding** is no longer part of this question either.
+   `Alarm_state` (`0` normal, `1` alarm, `2` high_alarm, `3` low_alarm, `4`
+   trouble) and `Alarm_priority` (`0`–`6`) are declared by the type system and
+   tabulated in Appendix A, and `control_status`'s two wire-characterised values
+   agree with their declared names (`2` `by_priority` under command, `4`
+   `input_only` on an input). What is missing is *only* an observation of a
+   non-zero value on the wire — a strictly smaller question than the one this
+   item was written to ask (§12.3.3).
 
 2. **Heartbeat-miss count for failed-node transition.** *Known:* there is **no
    application-layer ACK frame** — the `dir == 0x01` success (or `dir == 0x05`
@@ -10312,10 +10320,21 @@ specific test that would confirm or falsify it.
    FLN-invalid-drop-number, `0x0E12` FLN-device-failed, `0x0E15`
    physical-point-not-commandable — and `0x0E10`–`0x0E17` is the FLN band. The
    AP2 error-**class** names also exist (not-supported, bad-tag-value,
-   bad-packet-length, …). *Missing:* the mapping between the two, i.e. which
-   named class emits which code, and whether per-opcode error namespaces exist.
-   *Test:* drive each error-class condition deliberately on a lab panel
-   (malformed length, bad tag, wrong element count) and record the returned code.
+   bad-packet-length, …).
+   *Now — the namespace half is ANSWERED.* There are **no per-opcode error
+   namespaces**. The type system declares only **16** `*_Error_enum` types,
+   fifteen of them RACS partner and port operations, and where a member carries a
+   value it is the *same* value the global catalog uses: `invalid_partner_number`
+   = 2 = `invalid_command`, `partner_not_found` = 3 = `not_found`,
+   `partner_already_here` = 9 = `already_exists`. A per-operation error enum is a
+   **named subset** of one global code space, not a second one, so there is no
+   mapping to perform (§7.2.2). The full 42-code catalog is now published there
+   too.
+   *Missing:* which named class emits which code for the operations that declare
+   no enum, and one anomaly — five RACS enums carry a member at value **0**,
+   which the global catalog does not define. *Test:* drive each error-class
+   condition deliberately on a lab panel (malformed length, bad tag, wrong
+   element count) and record the returned code.
 
 4. **FLN / P1 and serial-AEM frame bytes.** *Known:* FLN points are a separate
    namespace reached via the `0x09xx` browse family over an established node
@@ -10375,6 +10394,34 @@ specific test that would confirm or falsify it.
    compare chain yields only its middle arm. **No structure in the catalog names
    either one as a field type**, so nothing can reach them and nothing is
    blocked. Neither is worth a capture.
+
+8. **How strictly does a panel enforce `msg_type`?** *Known:* the field is a
+   header length, `13 +` the total bytes of the four routing slots (§6.2), and a
+   panel largely checks it: holding node names constant, a frame whose value
+   matches its slots is answered 98.0% of the time and one that does not 6.2%.
+   *Missing:* it is **not** a plain equality test. Seven wrongly-framed frames
+   were answered anyway, off by `+5`, `−1` and `+1`, and seven samples do not
+   reveal the rule. Nor is it known whether the panel uses the field at all when
+   parsing or merely validates it — the slots are self-delimiting, so a receiver
+   need not consult it. *Test:* on a lab panel, sweep the value across a range
+   around the correct one for a fixed frame and record which values draw a reply;
+   the shape of the accepting set is the rule.
+
+9. **How is a cross-trunk point named?** *Known:* cross-trunk data flow is
+   brokered by the supervisor (§3.5) and PPCL references a local point as a
+   quoted colon-joined `"name:suffix"` pair (§14.2). *Missing:* the reference
+   syntax for a point on *another* trunk. Pass F went looking for the
+   `BAC_<device>_<TYPE>_<instance>` form and **no PPCL line in this corpus
+   mentions `BAC` at all**; nothing here shows how the trunk is qualified.
+   *Test:* capture or export a PPCL program from a site with two trunks that
+   actually shares points between them.
+
+10. **What does the `.BN` suffix mark?** *Known:* the BACnet name twin is
+    **bare ↔ `.BAC`**, four stems of four, both forms carrying traffic (§11.6).
+    *Missing:* `.BN` is a single stem, 60 occurrences, always suffixed, with no
+    bare form and no `.BAC` form anywhere in the corpus. One stem cannot say what
+    the suffix means. *Test:* a capture from a site with more than one `.BN`
+    point, or a database export showing what the suffix is configured on.
 
 ### Appendix E — Evidence-tag legend and lineage pointer
 
