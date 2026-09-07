@@ -287,7 +287,7 @@ The following terms are used consistently throughout (cross-referenced in detail
 
 This subsection is informative; nothing in it is required for interoperation. It orients an implementer to why the protocol is shaped as it is.
 
-**Powers → Landis & Gyr → Siemens.** P2's data model and much of its vocabulary descend from the **Powers System 600** of the 1980s and its **Protocol II** — the peer ("token-passing") network discipline of that era — as distinct from **Protocol I**, the master/slave polling discipline that survives conceptually as the FLN sub-bus beneath a panel. [D/I] The product line passed through **Landis & Gyr** (and a parallel **Staefa Control System** branch) before consolidating under Siemens' APOGEE, which is why conventions from several BAS lineages coexist in the modern system. [D/I]
+**Powers → Landis & Gyr → Siemens.** The vendor's shipping code still says so: `Bn_adapt.dll` names its P2↔BACnet mapping table **`S600toBACnetXrefTable`** — *System 600* — so "S600" is the internal name for the P2 side in a modern BACnet adapter, not merely a historical label. [S] P2's data model and much of its vocabulary descend from the **Powers System 600** of the 1980s and its **Protocol II** — the peer ("token-passing") network discipline of that era — as distinct from **Protocol I**, the master/slave polling discipline that survives conceptually as the FLN sub-bus beneath a panel. [D/I] The product line passed through **Landis & Gyr** (and a parallel **Staefa Control System** branch) before consolidating under Siemens' APOGEE, which is why conventions from several BAS lineages coexist in the modern system. [D/I]
 
 **PPCL.** The control language a panel executes is **Powers Process Control Language**, carrying the Powers name forward into the modern product. PPCL is specified, to the extent needed to read and write programs over the wire, in §14. [D]
 
@@ -539,6 +539,33 @@ A serial RS-485 BLN segment can be carried over IP by an **AEM (APOGEE Ethernet 
 Later product generations support a **BACnet BLN (BBLN)**: panels that are BACnet-native (or dual P2+BACnet, e.g. DXR-class controllers) and present themselves over BACnet/IP (UDP/47808, I-Am/Who-Is) rather than over P2. The discovery engine has distinct `HandleAddEBlnRequest` (P2) vs `HandleAddBBlnRequest` (BACnet, via `IAm`) paths. [S][D]
 
 A BBLN is **out of scope for this document**: it is a different protocol stack with a different addressing model, different framing, and a different security surface. The only cross-tier fact a P2 implementer needs is the negative one in §3.5: **there is no BACnet→P2 routing path**. A point on a BBLN is not reachable through a P2 frame and vice versa. [D][I]
+
+##### What the BACnet adapter reveals about P2
+
+`Bn_adapt.dll` is the supervisor component that makes a BACnet network look like
+a P2 trunk. To build a P2 command it must state the P2 model, and its exported
+C++ symbols do — readable from the export table and RTTI descriptors in the
+shipped binary, with no decompilation. Four of them are worth recording because
+each corroborates something this document establishes from a different
+direction: [S]
+
+| symbol | what it says |
+|---|---|
+| `AP2Cmd::Create(char const*, STACK_TYPE, unsigned short, …)` | a P2 command is built from a **trunk name**, a stack selector and a **u16 function code** — the opcode width of §9.1 and the name-addressed trunk of §6.4 |
+| `AP2Cmd::SetTrunkName(const char*)` / `GetTrunkName(char*)` | the trunk is addressed by a **name string**, not a number |
+| `AP2Cmd::BLN2CPI(STACK_TYPE, unsigned char const*, …)` | an explicit **BLN → CPI** conversion — the "Common Protocol Interface" tier above the wire opcode (§9.1.1) is a real layer in the vendor's code, not a reading of the enum |
+| `S600toBACnetXrefTable::TrunkAndNode` | a P2 address modelled as a **(trunk, node) pair** (§6.4) |
+| `BNBacNetAddTrunkRequestXlator`, `…RemoveTrunkRequestXlator` | BACnet networks are added and removed **as trunks** — the adapter's whole premise |
+
+The translator family is large — roughly forty `*Xlator` classes, one per BACnet
+service — and the direction of travel is BACnet-service-in, P2-command-out. That
+is the shape to expect: **the supervisor speaks P2 natively and adapts BACnet to
+it**, not the other way round.
+
+Two cautions. This is the *supervisor's* model of P2, not a panel's, and §10.4.3
+records what happens when the supervisor's object model is mistaken for the wire
+model. And nothing here is cited in place of wire evidence — it is corroboration
+for claims that stand on their own bytes.
 
 #### 3.2.5 The logical BLN is self-organizing
 
@@ -1705,8 +1732,22 @@ carry **different** trunk names. The present corpus cannot test it — across **
 four-slot frames, slots 0 and 2 are identical in **621,263**, and all five exceptions are
 `dir == 0x00` research probes from one capture, with a deliberately mismatched BLN name, not
 production traffic. Every capture to hand is
-single-BLN, so the pair reading is **untested, not confirmed**. A capture taken where two BLNs
+single-BLN, so the pair reading is **untested on the wire**. A capture taken where two BLNs
 exchange traffic would settle it in one frame. [W] **[OPEN]**
+
+**It is, however, what the vendor's own code models.** `Bn_adapt.dll` — the
+adapter that presents a BACnet network to the supervisor *as a P2 trunk* — ships
+a class whose RTTI descriptor reads `S600toBACnetXrefTable::TrunkAndNode`: a P2
+address held as a **(trunk, node) pair**, nested inside the table that maps the
+P2 side to BACnet. Its command object takes the same shape —
+`AP2Cmd::Create(char const*, STACK_TYPE, unsigned short, …)`, i.e. a **trunk
+name**, a stack selector and the u16 function code — and exposes
+`SetTrunkName(const char*)` / `GetTrunkName(char*)`, so the trunk is identified
+by a *name string*, exactly as slots 0 and 2 carry one. This is a second,
+independent binary agreeing with the routing object of the paragraph above. It
+does not settle what a cross-BLN frame puts in slot 2, which is why the item
+stays open — but the pair model is no longer only an inference from slot
+duplication. [S]
 
 Two further details from the same object model. Names decompose into a **base plus a suffix** with
 an explicit truncate operation — which is the mechanism behind the length limits of §3.3.2 rather
