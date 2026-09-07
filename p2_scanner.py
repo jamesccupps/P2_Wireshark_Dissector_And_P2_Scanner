@@ -857,8 +857,10 @@ class P2Message:
     # 6.2). Earlier releases of this scanner defined TYPE_DATA = 0x33 and
     # TYPE_HEARTBEAT = 0x34 and probed between them; those constants were the
     # value this site's node names happen to produce, and hard-coding them makes
-    # the scanner unusable anywhere else. The panel discards a frame whose value
-    # does not match its own slots, without replying. Use msg_type_for().
+    # the scanner unusable anywhere else. A panel mostly discards a frame whose
+    # value does not match its own slots and never says so -- 98.0% answered
+    # against 6.2%, node names held constant (PROTOCOL.md 6.2.2). Use
+    # msg_type_for().
 
     # Response direction byte (first byte of S2C payload)
     DIR_REQUEST   = 0x00   # C2S

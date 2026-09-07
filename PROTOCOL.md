@@ -159,7 +159,7 @@ P2 ("Protocol II") is the application-layer network protocol of the Siemens APOG
 - **Transport.** TCP, default port **5033** — every field panel and the supervisor listens here; some installations add a second supervisor-side listener on 5034. Frame semantics derive from a frame's contents and direction, never from the TCP port that carried it.
 - **Peer model.** On the backbone (the BLN, also called the ALN) every member — supervisor and panel alike — is an equal node, and any node may originate traffic. "Request" and "response" describe the role of a *frame*, not of a node.
 - **Frame.** Big-endian throughout: `u32 total_len | u32 msg_type (a header length, see below) | u32 sequence | u8 direction | four NUL-terminated ASCII routing slots [BLN, dst-node, BLN, src-node] | (request/push frames only) u16 opcode | body`. The opcode is present only on `direction == 0x00` frames; a response is matched to its request by the echoed sequence number.
-- **`msg_type` is a header length, not a message class.** It is `13 + the total bytes of the four routing slots` — the offset at which the slot block ends. **Compute it; never choose it.** A panel silently discards a frame whose value does not match its own slots, so a client that hard-codes a constant simply goes unanswered. Earlier editions of this document described six "message classes" in legacy/modern "dialect" pairs; that model is withdrawn in full (§6.2). String encoding (ASCII vs RAD-50) *is* a real per-firmware-revision property and is read from `CABINET_DISPLAY` (`0x010C`); framing is not.
+- **`msg_type` is a header length, not a message class.** It is `13 + the total bytes of the four routing slots` — the offset at which the slot block ends. **Compute it; never choose it.** A panel mostly discards a frame whose value does not match its own slots, and says nothing when it does — so a client that hard-codes a constant goes unanswered, intermittently (§6.2.2). Earlier editions of this document described six "message classes" in legacy/modern "dialect" pairs; that model is withdrawn in full (§6.2). String encoding (ASCII vs RAD-50) *is* a real per-firmware-revision property and is read from `CABINET_DISPLAY` (`0x010C`); framing is not.
 - **Operations.** A 2-byte function code (the "AP2 function code") selects the operation; about 630 are defined and **135** are observed on the wire in the reference corpus (§9.5). The high-volume operations are the COV value push (`0x0274`), the liveness/identity heartbeat (`0x4640`), point command and read (`0x0240` / `0x0220`), COV subscribe/unsubscribe (`0x0271` / `0x0273`), and the database upload/replication family.
 - **Encoding.** Strings are length-prefixed TLVs (`01 00 <len> <ascii>`); analog values are IEEE-754 single-precision big-endian floats; command priority rides a scope tag. Bodies are ordered, positionally-typed field structures (ASDUs).
 - **Control logic.** Panels run a resident, line-numbered control language — Powers Process Control Language (PPCL); the supervisor reads, edits, and uploads it over P2 but never executes it (§14).
@@ -217,7 +217,7 @@ A field-layout table is tagged **[S]** when its field order and types come from 
 
 #### 1.4.1.1 What `[W]` rests on: one deployment
 
-Every `[W]` claim in this document is grounded in a wire corpus of **638,080
+Every `[W]` claim in this document is grounded in a wire corpus of **621,268
 trusted P2 frames from a single site** — one BLN, one supervisor, a handful of
 panels. That is a large corpus and a narrow one, and the narrowness has a
 specific consequence worth stating plainly rather than leaving to the reader:
@@ -1383,12 +1383,12 @@ followed by an opcode-specific body. [W]
 | Offset | Field | Type | Value/Notes | Tag |
 |---|---|---|---|---|
 | 0 | `total_len` | u32 BE | Total frame length, **including these 4 bytes** (self-inclusive). | [W] |
-| 4 | `msg_type` | u32 BE | **A header length, not a class**: `13 + the total bytes of the four routing slots` — the offset at which the slot block ends (§6.2). The name is kept because it is what every existing tool calls the field. Its top three bytes are zero for the unremarkable reason that a routing header is never 16 MB long. **Compute it; a panel discards a frame whose value does not match its own slots, without replying.** | [W] |
+| 4 | `msg_type` | u32 BE | **A header length, not a class**: `13 + the total bytes of the four routing slots` — the offset at which the slot block ends (§6.2). The name is kept because it is what every existing tool calls the field. Its top three bytes are zero for the unremarkable reason that a routing header is never 16 MB long. **Compute it**: holding node names constant, a frame whose value matches its slots is answered 98.0% of the time and one that does not 6.2% (§6.2.2). | [W] |
 | 8 | `sequence` | u32 BE | Per-connection request sequence; echoed verbatim in the matching response (§6.5). | [W] |
 | 12 | `dir` | u8 | Direction byte: `0x00` request/push, `0x01` success, `0x05` error (§6.3). | [W] |
 | 13 | `slot[0]` | ASCIIZ | BLN name. | [W] |
 | … | `slot[1]` | ASCIIZ | Destination node name (on a request) / source node name (on a response). | [W] |
-| … | `slot[2]` | ASCIIZ | BLN name. Identical to slot[0] in 638,075 of 638,080 frames here — but this corpus is single-BLN, and §6.4 gives a `(trunk, node)` pair reading under which slots 0 and 2 would differ on a cross-BLN frame. **[OPEN]** | [W] |
+| … | `slot[2]` | ASCIIZ | BLN name. Identical to slot[0] in 621,263 of 621,268 frames here — but this corpus is single-BLN, and §6.4 gives a `(trunk, node)` pair reading under which slots 0 and 2 would differ on a cross-BLN frame. **[OPEN]** | [W] |
 | … | `slot[3]` | ASCIIZ | Source node / self identity (on a request) / destination (on a response). | [W] |
 | `S` | `opcode` | u16 BE | The 2-byte AP2 function code. **Present if and only if `dir == 0x00`** (§6.4). | [W] |
 | `S+2` | `body` | bytes | Opcode-specific request body, or — on a response — the result payload / 2-byte error tail. | [W] |
@@ -1469,7 +1469,7 @@ msg_type` + `u32 seq` + `u8 dir` — so the field is simply **the byte offset, f
 the start of the frame, at which the four routing slots end**: where the opcode
 begins on a request, and where the body begins on a response. It is redundant
 with the frame's own geometry, which is exactly what makes it checkable, and the
-panel does check it. [W]
+panel largely does check it — see §6.2.2. [W]
 
 It is a `u32` whose top three bytes are always zero, and that was the first
 thing that should have been suspicious. A class enumeration with six members
@@ -1477,16 +1477,31 @@ does not need thirty-two bits. A length does.
 
 #### 6.2.2 The evidence
 
-Every figure here is over the 638,080 trusted frames of the corpus, and none of
+Every figure here is over the 621,268 trusted frames of the corpus, and none of
 it needed a capture that did not already exist: [W]
 
 | test | result |
 |---|---|
-| `msg_type == 13 + total slot bytes` | **637,343 of 638,080 — 99.885%** |
+| `msg_type == 13 + total slot bytes` | **620,532 of 621,268 — 99.88%** |
 | header length (frame length − body length) | exactly `msg_type` on every response, `msg_type + 2` on every request — the 2 being the opcode a request carries and a response does not |
-| the 737 exceptions | **every one** from this project's own two research hosts. Not one from a supervisor or a panel |
-| were the 737 answered? | **729 no reply, 8 answered** — the panel drops a frame whose length field is wrong |
+| the 736 exceptions | **every one** from this project's own two research hosts. Not one from a supervisor or a panel |
 | do the "classes" partition by host? | no. **One host emits all four** of `0x2E`, `0x2F`, `0x33`, `0x34` |
+
+**Does the panel check it? Mostly, and the confound has to be controlled for.**
+All 736 mismatches are ours, and they come from captures that *also* probe wrong
+BLN and node names — so "no reply" could be the name rather than the length.
+Restricting to requests whose (panel, BLN, destination-node) triple drew a reply
+somewhere in the corpus, which holds the names constant: [W]
+
+| | answered | unanswered | answer rate |
+|---|---:|---:|---|
+| `msg_type` correct | 306,987 | 6,140 | **98.0%** |
+| `msg_type` wrong | 7 | 106 | **6.2%** |
+
+A sixteen-fold difference with the names held good, so the field is checked. It
+is **not an absolute gate**: seven wrongly-framed frames were answered anyway,
+off by `+5`, `−1` and `+1`. Whatever the panel does with the value, it is not a
+plain equality test, and seven samples do not show what it is. **[OPEN]**
 
 #### 6.2.3 What the six "classes" actually were
 
@@ -1566,11 +1581,13 @@ belong to the peers and opcodes that produce them rather than to a class byte:
 add 13, and write that. There is no dialect to detect, no candidate set to
 probe, and no need to fingerprint the peer's firmware before framing a request.
 
-The failure mode if you get it wrong is the worst kind: **the panel does not
-answer and does not complain.** 729 of the 737 wrongly-framed frames in this
-corpus drew no reply at all. Anyone who read the previous edition of this
-section and hard-coded `0x33` would see a panel that "does not support" whatever
-they asked, when in fact the frame was discarded before the opcode was read.
+The failure mode if you get it wrong is the worst kind: **the panel usually does
+not answer and never complains.** Holding the node names good, a correct value
+is answered 98.0% of the time and a wrong one 6.2% (§6.2.2). Anyone who read the
+previous edition of this section and hard-coded `0x33` would see a panel that
+"does not support" whatever they asked, when in fact the frame was discarded
+before the opcode was read — and would see it *intermittently*, since a few
+wrong values do get through, which is worse than a clean failure.
 
 *This correction came from a reader who ran the published dissector against his
 own site, saw a value the table did not list, and worked out what it was. The
@@ -1668,9 +1685,10 @@ with the trunk it lives on. The duplication is then not redundancy at all; it is
 and both pairs happen to name the same trunk on a single-BLN network.
 
 That is a **falsifiable prediction**: on a frame that crosses between two BLNs, slots 0 and 2 should
-carry **different** trunk names. The present corpus cannot test it — across **638,080** trusted
-four-slot frames, slots 0 and 2 are identical in **638,075**, and all five exceptions are
-`dir == 0x00` research probes with a deliberately mismatched BLN name, not production traffic. Every capture to hand is
+carry **different** trunk names. The present corpus cannot test it — across **621,268** trusted
+four-slot frames, slots 0 and 2 are identical in **621,263**, and all five exceptions are
+`dir == 0x00` research probes from one capture, with a deliberately mismatched BLN name, not
+production traffic. Every capture to hand is
 single-BLN, so the pair reading is **untested, not confirmed**. A capture taken where two BLNs
 exchange traffic would settle it in one frame. [W] **[OPEN]**
 

@@ -3574,13 +3574,15 @@ local function dissect_one(tvb, pinfo, tree)
     local val, adv = cstr(tvb, off); if not val then break end
     st:add(sfields[s], tvb(off, adv-1), val); slots[s] = val; off = off + adv
   end
-  -- The header length is redundant with the slots, so check it. The panel does:
-  -- a frame whose value does not match its own slots is discarded without a
-  -- reply, which is the hardest failure to diagnose from the sending side.
+  -- The header length is redundant with the slots, so check it. The panel
+  -- largely does: holding node names constant, a frame whose value matches its
+  -- slots is answered 98.0% of the time and one that does not 6.2%
+  -- (PROTOCOL.md 6.2.2). An intermittent silent drop is the hardest failure to
+  -- diagnose from the sending side, which is why this is worth surfacing.
   st:add(f.hdr_calc, tvb(4,4), off):set_generated()
   if hdrlen ~= off then
     st:add(f.hdr_bad, tvb(4,4),
-           string.format("wire says %d, slots give %d (13 + %d) -- a panel drops this",
+           string.format("wire says %d, slots give %d (13 + %d) -- a panel usually drops this",
                          hdrlen, off, off - 13)):set_generated()
   end
   -- seq-state key: per TCP stream + the (echoed) sequence number
