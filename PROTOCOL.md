@@ -215,6 +215,41 @@ Every non-trivial claim carries an inline tag, at the end of the sentence or in 
 
 A field-layout table is tagged **[S]** when its field order and types come from the ASDU structure definitions, and **[W]** when the layout has additionally been confirmed on the wire. A behavioral claim tagged **[D]** must never be presented as a byte-level wire fact; where the byte offsets behind a documented behavior are not pinned, the gap is tagged **[OPEN]**.
 
+#### 1.4.1.1 What `[W]` rests on: one deployment
+
+Every `[W]` claim in this document is grounded in a wire corpus of **638,080
+trusted P2 frames from a single site** — one BLN, one supervisor, a handful of
+panels. That is a large corpus and a narrow one, and the narrowness has a
+specific consequence worth stating plainly rather than leaving to the reader:
+
+> **Anything that is constant across one deployment cannot be distinguished, by
+> that deployment, from a constant of the protocol.**
+
+No amount of care applied to this corpus fixes that. Frequency is not evidence
+of universality, and a claim that held in 620,000 frames here can still be an
+artefact of one site's configuration.
+
+**The worked example is §6.2, and it is not hypothetical.** Four editions of
+this document described the `msg_type` field as a six-valued message class in
+legacy/modern "dialect" pairs. It is a header length. The six values were six
+combinations of *this site's* node-name lengths; the "legacy versus modern
+firmware" split was single-digit versus double-digit panel numbers. Every test
+run against this corpus confirmed the wrong model, because the field really is
+constant per connection here. It was found by a reader who ran the published
+dissector at his own site and saw a seventh value on his first frame.
+
+Two things follow for anyone using this document.
+
+- **Prefer the internally-checkable claims.** A statement backed by the type
+  system `[S]`, the vendor's codec `[C]`, panel firmware `[F]` or an external
+  standard does not depend on this corpus at all. A `[W]` claim about a value
+  being *stable* is the weakest kind here, and where one matters to you, check
+  it against your own traffic.
+- **A capture from another site is the most valuable thing this document can
+  receive.** Not more frames — *different* names, different firmware, a
+  different BLN. One screenshot from one such site produced the largest
+  correction in this document's history.
+
 #### 1.4.2 Byte, integer, and field conventions
 
 - Hexadecimal byte values are written `0xNN`. A run of literal bytes is written space-separated, e.g. `01 00 04`.
