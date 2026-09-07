@@ -2853,6 +2853,44 @@ String fields have encoding-dependent capacity budgets. Name fields (point name,
 
 **Codec-enforced byte maxima (cross-validated).** The ASCII serializer applies a fixed maximum byte length per string field, and the same caps recur across dozens of independent operation bodies — so they are reliable worst-case widths for an encoder, not per-opcode accidents. The dominant cap is **31 bytes (0x1F) for object / point / program-name fields** (seen on the command, COV, cabinet, EBLN, and enum families alike — it is by far the most common string cap; this is the byte width of the 30-character object-name field above, i.e. 30 usable characters within a 31-byte budget), with **13 bytes for a short descriptor or secondary name** (the 12-character descriptor above in its field budget), roughly **21 bytes for an operator credential / logon identity**, and a **free-text band of ~248–257 bytes** for message text, license strings, point descriptions, and PPCL program-line text. (This 31-byte object-name cap is distinct from the ≤15-byte **node**-name limit above — they are different fields: the node name is the access-gate identity in the routing slot / node-name table, while the 31-byte cap governs point, object, and program names inside the body.) An encoder SHOULD truncate to these maxima before framing; an over-length field is the most common reason a panel silently rejects an otherwise well-formed write. [D][I]
 
+#### 8.4.4 Reserved characters — what a name may not contain, and why
+
+The vendor's PPCL reference states the rule for program names: **a maximum of 30
+characters**, letters, digits, periods and spaces, and *"any ASCII character
+except the following: `?` `*` `[` `]` `{` `}` and the vertical bar"*. [D]
+
+Taken alone that is a rule to obey. The corpus explains it. Every one of those
+seven characters that occurs anywhere in 4,412 decoded name-like strings occurs
+**only** in a role that requires it to be reserved, and **never inside a name**:
+[W]
+
+| character | where it actually appears | count |
+|---|---|---:|
+| `*` | `name_pattern`, `suffix_pattern`, `last_name` — always as the entire field, never as part of one | 1,625 |
+| **vertical bar** | `entry_id`, `originating_node`, `node_name`, `node_bits[]` — always the node/port separator of §3.3, i.e. the bar between `<node>` and `<port>` | 145 |
+| `?` `[` `]` `{` `}` | not observed | 0 |
+
+So the exclusion list is the protocol's **metacharacter set**, and this document
+had been describing two of its members in separate sections without stating the
+rule that connects them: `*` is the wildcard selector of §10.2.3's
+range-and-resume idiom, and `|` is the port separator of §3.3. A name containing
+either would be ambiguous with a wildcard or with an address. The remaining five
+are presumably further pattern syntax; nothing in this corpus exercises them, so
+that is inference, not observation. [D][W][I]
+
+**Two consequences for an implementer.** A name you send is not free text —
+strip or reject the seven before putting a caller-supplied string in a name
+slot or a name TLV. And a name you *receive* consisting of exactly `*` is a
+wildcard, not a point called "star": the `name` field in this corpus reaches 24
+characters and never contains a reserved character, while `name_pattern` is the
+bare `*` on 1,182 of its occurrences.
+
+**The 30-character ceiling is consistent across the naming system**, which is
+worth noting because it recurs independently: node names are ≤ 30 on the wire
+(§3.3.2, and ≤ 15 where RAD-50 packing applies), and PPCL program names are ≤ 30
+here. The longest name-like string in the corpus is 24. Point *descriptors* are
+a separate and shorter budget at 16 (§10.3). [D][W]
+
 ### 8.5 ASDU field convention
 A P2 body is an **Application Service Data Unit (ASDU)** — the payload the request/response service carries. Each ASDU body is a sequence of **ordered, typed fields** in declaration order (an AsnBase-style structure: there are 1,144 such request/response/sub-type structures defined in the vendor type system). There is no per-field tag/name on the wire beyond what each primitive carries; field identity is **positional**, fixed by the structure definition for that opcode. A parser walks an ASDU left to right, consuming each field per its declared type. [S]
 
