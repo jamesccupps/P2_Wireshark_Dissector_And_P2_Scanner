@@ -985,6 +985,35 @@ The **AEM (APOGEE Ethernet Microserver)** is a Lantronix-class serial-to-TCP ter
 
 Critically, the AEM **does not define new P2 framing** [D]. It encapsulates the existing serial P2 byte stream inside a TCP connection — the same bytes that would have crossed the RS-485 trunk, wrapped in TCP. Channel 1 (TCP/3001) is therefore a **second observable P2-bearing TCP port** distinct from native 5033, but the application bytes inside it are serial-BLN P2, not the IP-native framing of §6 (the IP-native handshake/heartbeat opcode behavior is specific to the EBLN stack). An implementer treating an AEM Channel-1 stream must speak the serial-BLN framing, not assume the TCP/5033 IP-native conventions.
 
+**On a current supervisor this is not a legacy curiosity, it is the integration
+route.** Desigo CC's compatibility documentation states that **direct P2 RS-485
+is not supported** and that a serial ALN must be connected **through an AEM**.
+An operator whose serial panels will not come into Desigo CC is therefore not
+misconfiguring anything, and no amount of work on the panel side will change it
+— the supervisor does not offer the direct path. [D]
+
+**And the AEM need not be a physical box.** The same documentation lists two
+ways to satisfy the requirement — a **physical AEM device** *or* a **"virtual
+AEM in a PXC"** — so a site that already has a PXC on the Ethernet side may be
+able to bridge its serial trunk without buying hardware. The supported firmware
+range quoted for P2 networks in the same material is roughly **2.7 – 2.8.20**,
+which is worth checking on older panels before concluding the transport is at
+fault. [D]
+
+**The vendor's own pages disagree on the first point**, and the disagreement is
+recorded rather than resolved: Desigo CC's engineering help marks P2 RS-485
+plainly supported, while its compatibility list says direct connection is not
+and requires an AEM. The second is the more specific statement and matches the
+behavior an operator reported to this project. [D][OPEN]
+
+> **Evidence basis for this whole section, stated plainly.** Every claim in §4.2
+> is **[D]** — vendor documentation, not observation. **This corpus contains no
+> AEM traffic whatsoever**: of 621,268 trusted frames, 431,463 are on native
+> TCP/5033 and **zero** are on TCP/3001. Nothing here has been checked against a
+> capture, the serial-BLN framing inside such a stream remains **[OPEN]** (§4.3,
+> §4.5), and a capture from an AEM Channel 1 would be one of the more valuable
+> contributions this document could receive. [W][D][OPEN]
+
 ### 4.3 Serial BLN datalink (dedicated RS-485 trunk)
 
 The original P2 BLN is a terminated, multidrop **RS-485-style two-wire trunk** — the Powers "dedicated BLN" — tapped via a Trunk Interface (TI / TI2, e.g. part 538-670) at the workstation COM port.
