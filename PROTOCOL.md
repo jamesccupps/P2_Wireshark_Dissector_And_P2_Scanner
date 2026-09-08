@@ -267,8 +267,10 @@ legacy/modern "dialect" pairs. It is a header length. The six values were six
 combinations of *this site's* node-name lengths; the "legacy versus modern
 firmware" split was single-digit versus double-digit panel numbers. Every test
 run against this corpus confirmed the wrong model, because the field really is
-constant per connection here. It was found by a reader who ran the published
-dissector at his own site and saw a seventh value on his first frame.
+constant per connection here. **No test run against these captures could have
+failed**, and none did. What settles it is traffic from a deployment whose
+device names are different lengths, where a seventh value appears on the first
+frame.
 
 Two things follow for anyone using this document.
 
@@ -279,7 +281,7 @@ Two things follow for anyone using this document.
   it against your own traffic.
 - **A capture from another site is the most valuable thing this document can
   receive.** Not more frames — *different* names, different firmware, a
-  different BLN. One screenshot from one such site produced the largest
+  different BLN. A single frame from such a site produced the largest
   correction in this document's history.
 
 #### 1.4.2 Byte, integer, and field conventions
@@ -1717,11 +1719,13 @@ previous edition of this section and hard-coded `0x33` would see a panel that
 before the opcode was read — and would see it *intermittently*, since a few
 wrong values do get through, which is worse than a clean failure.
 
-*This correction came from a reader who ran the published dissector against his
-own site, saw a value the table did not list, and worked out what it was. The
-corpus here contains one site; his did not. It is the clearest argument possible
-for putting protocol work in the open, and for treating a single deployment as a
-sample of one.* [W]
+*This correction did not come from the corpus, and could not have. The field is
+constant per connection here, so every check run against these captures
+confirmed the wrong model — the error was invisible from the inside and obvious
+from the outside, where a value the table did not list turns up immediately. It
+is the clearest argument possible for publishing protocol work openly, where it
+meets deployments its author does not have, and for treating a single deployment
+as a sample of one.* [W]
 
 ### 6.3 The direction byte
 
