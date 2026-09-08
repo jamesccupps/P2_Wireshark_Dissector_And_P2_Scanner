@@ -5009,6 +5009,25 @@ here. At a site with different node-name lengths a frame-sized buffer would give
 a different body size — so an implementer should treat 220 as *this site's*
 observation, not a protocol constant.
 
+**Exact consumption is not the only test, and the other two agree with it.** A
+body can consume to exactly zero remainder and still be read **one byte out** —
+the widths would sum correctly while every field sat in the wrong place. Two
+checks catch that and neither depends on the structure library being right about
+*meaning*, only about *position*. Both were run over all **444,547** bodies on
+the wire, not the analysis sample (§1.4.1.1): [W]
+
+| check | result |
+|---|---|
+| **`FLOAT_` sanity** — a misaligned `f32` reads as NaN, infinity, a denormal, or a magnitude no building quantity takes | **128,953 floats decoded, 0 implausible.** No NaN, no infinity, nothing under `1e-6` or over `1e9` |
+| **`DATE_` self-consistency** — the four bytes are year, month, day-of-month **and day-of-week**, so each record checks itself | **10,189 real dates; 9,435 carry the weekday their own date falls on** |
+
+The 754 that do not are **sentinels, not misreads**, and identifying them is
+itself a result. **750** are the `0x0295` trend cursor's null value `00 01 01 00`
+(§10.8) — 1900-01-01 with the weekday byte left at zero. **Four** are `0x0989`
+request date fields reading month 0 and day 0, which is not a date either. Every
+`DATE_` in the corpus that carries a real date carries the right weekday for it:
+**9,435 of 9,435**.
+
 Two structural conventions recur. **CHOICE / tagged union:** several structures begin with a `tag_ : UNSIGNED_8` followed by one alternative per possible type (e.g. `All_points`, `Alarm_object`, `Physical_address_Lenum`); the tag selects which one alternative is actually present on the wire. **Counted array:** a `nrOf<x> : UNSIGNED_16` immediately precedes its `<x> : <T>[]` array. [S]
 
 ### 10.2 Shared sub-types
@@ -6413,6 +6432,20 @@ PPCL statement keywords (the `PPCL_statement_type` enum, 71 members: WHOPLOOP/WH
 | 4 | last_sequence_number | UNSIGNED32 | resume key (paging) |
 | 5 | last_date_time | DATE_TIME | resume key |
 | 6 | max_samples | UNSIGNED16 | cap on returned samples |
+
+**The resume key has a wire-observed null value, and it is not zero.** All
+**750** `0x0295` requests in the corpus carry `last_date_time` = `00 01 01 00` —
+year 0, month 1, day 1, day-of-week 0, i.e. **1900-01-01**, the minimum
+representable `DATE_` rather than an all-zero field. Every one of the 750 is
+that value, so this corpus only ever *starts* a trend walk and never resumes
+one. **A client beginning a walk sends the epoch, not zeros** — a decoder or
+generator that writes four zero bytes here is writing month 0 and day 0, which
+is not a date. The day-of-week byte is `0` and 1900-01-01 was a **Monday**, so
+the sentinel does not bother to fill it; that is the one place in the corpus
+where a `DATE_`'s weekday does not agree with its date, and it is why (§10.1, “exact consumption is not the only test”). [W]
+
+The responses are the opposite: **9,209 of 9,209** `Trend_data.time` stamps
+carry the weekday their own date falls on. [W]
 
 **`AP2_TREND_DATA_DISPLAY` response (0x0295)** — `name_response` + `point : All_points` + `nrOftrend_data:u16` + `trend_data : Trend_data[]` + `lenum_address` + `nrOftrend_dst:u16` + `trend_dst : Trend_dst[]`. Each **`Trend_data`** sample: `sequence_number:u32, time:DATE_TIME, point_value:Point_value, point_priority, out_of_service:bool, failed:bool, control_status, alarm_priority, acked:bool, in_alarm:bool, in_trouble:bool, commanded_to_alarm:bool, operator_disabled:bool, program_disabled:bool, proof_pending:bool`. [S]
 
