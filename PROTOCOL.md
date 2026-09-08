@@ -759,6 +759,44 @@ the vendor recommends it, which is why almost everything one sees uses it, and
 exactly why a tokenizer written against observed traffic will hard-code the
 wrong thing. [D]
 
+**All six occur on the wire, and that is the smaller half of the finding.**
+Across **326,143** name-like strings in the corpus: [W]
+
+| character | strings containing it | mostly in |
+|---|---:|---|
+| period | **163,815** | `name`, `name_pattern`, `last_name` |
+| space | 51,438 | `suffix`, `name` |
+| underscore | 9,873 | `name`, `last_name` |
+| dash | 1,275 | `name` |
+| comma | 329 | `name`, `descriptor` |
+| apostrophe | **1** | `descriptor` |
+
+**But "a site setting chosen from six" is not something a tokenizer can be built
+on, because names carry more than one of the six at a time.** This is a single
+site with a single configured separator, and it still produces names combining
+period with underscore (1,767 strings), space with underscore (3,575), space
+with period (529), and comma with dash (222). Shapes, with invented names
+carrying the same character combinations:
+
+```
+A07.CHW1_2_PGM            period AND underscore
+LEVEL 03 ZONE PMP_1_BAC   space  AND underscore
+FAN DIR. FWD              space  AND period
+GRP4-Smith,Jones&Lee      dash   AND comma
+```
+
+The reconciliation is that the configured setting governs the **structural**
+delimiter between name components, while the other five characters occur freely
+*inside* a component — a space inside `LEVEL 03 ZONE`, an underscore inside
+`PMP_1_BAC`. Nothing on the wire marks which role a given character is playing.
+
+**So the practical rule is stronger than "do not hard-code the separator":
+do not split a point name at all unless you know the site's setting out of
+band, and do not assume the other five characters are absent when you do.**
+Treat a name as an opaque string wherever the protocol lets you — every opcode
+that takes a name takes it whole, and §10.2.3's range-and-resume idiom compares
+names without decomposing them. [W][D]
+
 Note that this is the opposite constraint from the scopes below it: BLN, node
 and site names *forbid* periods and spaces (§3.4.1–§3.4.3), while a point name
 may be joined by either. A client splitting a compound name must take the
@@ -7233,7 +7271,11 @@ Panel-resident analog points are different, and the constants are unobvious:
 
 **The count range is a property of the controller family and the signal class
 together**, and neither end of it is 0 or a power of two. These are the raw
-digitized ranges an analog **input** is defined against: [D]
+digitized ranges an analog **input** is defined against — **vendor
+documentation, not measurement**, and not checkable from this corpus, because
+the wire carries the *converted* engineering value (§12.3) and never the raw
+count. An implementer scaling counts to engineering units is trusting the table
+below exactly as far as they trust the manual it came from: [D]
 
 | Controller family | current | voltage | pneumatic |
 |---|---|---|---|
