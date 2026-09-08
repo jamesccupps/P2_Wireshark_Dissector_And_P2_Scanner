@@ -6740,24 +6740,37 @@ that an enum's members can be **bit positions** rather than values, `Schedule_da
 being the example. That was read off the declaration. It is now measured, and the
 values are unambiguous: [W]
 
-| value | bits | ×  | reads as |
-|---:|---|---:|---|
-| `62` | `0111110` | **56** | **Mon, Tue, Wed, Thu, Fri** |
-| `127` | `1111111` | 2 | all seven days |
-| `16` | `0010000` | 20 | Thursday |
-| `8` | `0001000` | 2 | Wednesday |
+Across **all** 115 `Schedule_days` fields in the corpus — not the 60-body
+sample, which showed four values — every one of the thirteen distinct values is
+a coherent day mask: [W]
 
-A weekday mask dominating a building's schedules is not a coincidence, and none
-of the four is a declared member value — the enum declares `Sunday` = 0 through
-`Replacement7` = 13, which as *values* would be meaningless here. `Cov_mask`
-behaves the same way: only `0` and `65535` occur, all-clear and all-set, against
-eight declared members that are plainly bit positions. **Read both as masks over
-the declared positions, never as values.** [W][S]
+| value | bits | × | reads as |
+|---:|---|---:|---|
+| `62` | `0111110` | **63** | **Mon, Tue, Wed, Thu, Fri** — the weekday mask |
+| `16` | `0010000` | 23 | Thursday |
+| `1` `2` `4` `8` `32` `64` | one bit each | 4, 4, 2, 4, 3, 2 | Sun, Mon, Tue, Wed, Fri, Sat |
+| `65` | `1000001` | 3 | **Sunday + Saturday — the weekend** |
+| `30` | `0011110` | 1 | Mon–Thu |
+| `126` | `1111110` | 2 | Mon–Sat |
+| `127` | `1111111` | 2 | all seven |
+| `512` | bit **9** | 2 | **`Replacement3`** |
+
+Seven single-day masks, a weekday mask, a weekend mask, Mon–Thu, Mon–Sat and
+all-seven. Not one is a declared member *value*, and `512` settles the shape:
+bit 9 is `Replacement3`, so the mask covers **all fourteen declared members** —
+bits 0–6 the days, bits 7–13 the replacement slots — not just the seven days.
+
+`Cov_mask` reads the same way, and the full corpus supplies the confirmation the
+sample could not: its dominant non-zero value is **`0x00FF`** (6,182 of 13,400)
+— **eight bits set for the eight declared positions** — alongside `0xFFFF`
+(1,176) and `0` (6,042). A mask of exactly the declared width is much harder to
+explain as anything else. **Read both as masks over the declared positions,
+never as values.** [W][S]
 
 **Two enums carry `255` as a sentinel the declaration does not list.**
 `Cabinet_report_config` declares `reports_to_port0`…`port4` and reads `255` on
-**57 of 60** bodies (with `1` on the other three); `Point_priority` declares 27
-members topping out at 116 and reads `255` once in 2,968. Neither is in range,
+the great majority of its 238 occurrences corpus-wide; `Point_priority` declares
+27 members topping out at 116 and reads `255` in 228,818 occurrences. Neither is in range,
 both are `0xFF`, and the obvious reading — *unset / not configured* — is
 consistent with `Cabinet_report_config` being the dominant value on a site that
 routes no cabinet reports. A decoder must not treat an out-of-range enum value
