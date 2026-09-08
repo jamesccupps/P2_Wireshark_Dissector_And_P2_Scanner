@@ -231,7 +231,9 @@ def decode_body(opcode, body):
     if r.struct is None:
         decode_stats["no structure declared"] += 1
         return
-    if r.error is None:
+    if r.padded:
+        decode_stats["decoded, zero-padded to a fixed size"] += 1
+    elif r.error is None:
         decode_stats["decoded, whole body consumed"] += 1
     elif r.error.endswith("does not account for"):
         decode_stats["decoded, trailing bytes"] += 1

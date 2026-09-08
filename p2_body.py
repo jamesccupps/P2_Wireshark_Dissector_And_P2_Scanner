@@ -48,7 +48,9 @@ except ImportError:                                       # pragma: no cover
     A = None
 
 Field = namedtuple("Field", "path type offset width value note")
-Result = namedtuple("Result", "struct fields consumed length error truncated")
+Result = namedtuple("Result",
+                    "struct fields consumed length error truncated padded",
+                    defaults=(0,))
 
 _MAXDEPTH = 24
 
@@ -281,13 +283,17 @@ def decode(opcode, direction, body, struct_name=None):
     Returns a Result. `error` is None on a clean walk; `consumed` is how far the
     walk got either way, so a partial decode is still usable. `truncated` says
     the body ended at a field boundary, which is normal for a short response.
+    `padded` is the count of trailing zero bytes when the remainder is all zeros
+    -- a padded request is well-formed (PROTOCOL.md §10.1) and is NOT an error.
     """
     if A is None:
-        return Result(None, [], 0, len(body), "p2_asdu.py is not importable", False)
+        return Result(None, [], 0, len(body), "p2_asdu.py is not importable",
+                      False, 0)
     name = struct_name or structure_for(opcode, direction)
     if not name:
         return Result(None, [], 0, len(body),
-                      "no structure is declared for %#06x %s" % (opcode, direction), False)
+                      "no structure is declared for %#06x %s" % (opcode, direction),
+                      False, 0)
     w = _Walker(bytes(body))
     try:
         n = w.read(0, name, "", 0, None)
@@ -303,16 +309,22 @@ def decode(opcode, direction, body, struct_name=None):
             n = w.read(n, ftype, fname, 0, name)
     except _Fail as e:
         n = w.out[-1].offset + w.out[-1].width if w.out else 0
-        return Result(name, w.out, n, len(body), str(e), w.truncated)
+        return Result(name, w.out, n, len(body), str(e), w.truncated, 0)
     err = None
+    padded = 0
     if n < len(body):
         # An all-zero remainder is padding, not records -- 174 request bodies in
         # the reference corpus are padded to a fixed 220 bytes, and calling that
         # "trailing bytes" makes a well-formed request look defective. The two
-        # are worth telling apart; PROTOCOL.md 10.1 does, and now so does this.
+        # are worth telling apart; PROTOCOL.md 10.1 does, and so does this.
+        #
+        # Padding is reported in `padded`, NOT in `error`: a padded request is
+        # well-formed, and a caller that treats a non-None `error` as a failure
+        # would otherwise reject it. Recovering the distinction by matching on
+        # the text of the message is not an interface.
         rest = bytes(body[n:])
         if not any(rest):
-            err = "%d bytes of zero padding after the structure" % len(rest)
+            padded = len(rest)
         else:
             err = "%d trailing bytes the structure does not account for" % len(rest)
-    return Result(name, w.out, n, len(body), err, w.truncated)
+    return Result(name, w.out, n, len(body), err, w.truncated, padded)

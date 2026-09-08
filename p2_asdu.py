@@ -2089,6 +2089,8 @@ OPS = {
     0x5354: ['AP2_Hoa_Map_Look_Request', 'AP2_Hoa_Map_Look_Response'],
     0x5355: ['AP2_Hoa_Map_Add_Request', None],
     0x700c: ['AP2_WS_APOGEEEDIT_GET_STATE_Request', 'AP2_WS_APOGEEEDIT_GET_STATE_Response'],
+    0x4200: ['AP2_TEC_Log_Request', None],
+    80: ['User_profile', None],
 }
 
 OP_TAILS = {
@@ -2732,6 +2734,7 @@ STRUCTS = {
     'AP2_TEC_Initialize_Response': [['team_response', 'Team_response'], ['wild_error', 'UNSIGNED16']],
     'AP2_TEC_Local_Init_Value_Log_Request': [['def_TEC_app', 'Def_TEC_app']],
     'AP2_TEC_Local_Init_Value_Log_Response': [['name_response', 'Name_response'], ['point', 'All_points'], ['init_value_modified', 'BOOLEAN_'], ['lenum_address', 'Physical_address_Lenum'], ['point_extension2', 'Point_extension2']],
+    'AP2_TEC_Log_Request': [['user_profile', 'User_profile'], ['team_search', 'Team_search'], ['application_number', 'SHORT_']],
     'AP2_TEC_Look_Request': [['user_profile', 'User_profile'], ['team_search', 'Team_search']],
     'AP2_TEC_Look_Response': [['team_response', 'Team_response'], ['tec_body', 'TEC_body']],
     'AP2_TEC_Member_Log_Request': [['user_profile', 'User_profile'], ['application_family', 'Application_family'], ['team_type', 'UNSIGNED16'], ['name_search', 'Name_search'], ['suffix_is_number', 'BOOLEAN_'], ['member_number', 'UNSIGNED16']],
