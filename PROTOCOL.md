@@ -1991,8 +1991,10 @@ final segment's length is `total - cursor`. The sender knows `total` before it
 begins, and the command object carries an explicit more-follows field, set on the
 segmenting path and cleared on the direct one. [S]
 
-**The ceiling is not exercised by anything we have captured.** No body in the
-corpus exceeds 16,382 B: the largest complete body is 1,570 B and the largest
+**The ceiling is not exercised by anything we have captured**, and this is one
+of the few figures a full-corpus walk did not move. Across all **444,547**
+bodies on the wire — not the analysis sample of §1.4.1.1 — **no body exceeds
+16,382 B and the largest is 1,570 B**, a `0x0295` trend response. The largest
 *declared* body is the 12,073-byte replication data store of §9.5. So a client
 may size a receive buffer at 16 KB with confidence for this implementation, but
 the on-wire form of a **multi-segment** exchange — whether it appears as two P2
@@ -5987,27 +5989,44 @@ three bytes before it and everything after must consume the body exactly.
 Searching for the arm width that satisfies both: **54 of 54 bodies admit exactly
 one width — none admits two, none admits none.** [W]
 
-| arm | width | observed on | how confirmed |
-|---|---:|---|---|
-| `no_alarming` | 0 | all types | `NULL_` |
-| `std_digital_` | **38 B** | `ldi`, `l2sl` | anchor; and independently `ldo` alarmed tail 44 − unalarmed 6 |
-| `std_analog_` | **47 B** | `lai` | anchor, 44 bodies |
-| `enhanced_analog_` | **55 B** | `lai` | anchor, 3 bodies |
-| `enhanced_digital_` | **48 B** | digital | solved on the alarm-mode uploads, then **independently confirmed** — see below |
-| `std_single_analog_` | 42 B | — | type system only |
-| `enhanced_lenum_` | 50 B | — | type system only |
-| `bacnet_alarm_analog_` | 16 B | — | type system only |
-| `bacnet_alarm_digital_` | 7 B | — | type system only |
+Walking the whole corpus rather than the analysis sample raises every count by
+roughly an order of magnitude and adds something the anchor argument did not
+have — **each width now closes its body across four or more different
+operations**, not one structure: [W]
+
+| arm | width | bodies | consume exactly | operations carrying it |
+|---|---:|---:|---|---|
+| `no_alarming` | 0 | 23,410 | **100%** | `0x0981`, `0x0271`, `0x0220`, `0x4221`, … |
+| `std_analog_` | **47 B** | 483 | **100%** | `0x0981`, `0x0220`, `0x0508`, `0x0271` |
+| `std_digital_` | **38 B** | 347 | **100%** | `0x0981`, `0x0220`, `0x0295`, `0x0271` |
+| `enhanced_analog_` | **55 B** | 87 | **100%** | `0x0981`, `0x0220`, `0x0295`, `0x0271` |
+| `enhanced_digital_` | **48 B** | 36 | **100%** | `0x0981`, `0x0220`, `0x0508`, `0x0271` |
+| `std_single_analog_` | 42 B | **0** | — | type system only |
+| `enhanced_lenum_` | 50 B | **0** | — | type system only |
+| `bacnet_alarm_analog_` | 16 B | **0** | — | type system only |
+| `bacnet_alarm_digital_` | 7 B | **0** | — | type system only |
+
+**24,363 of 24,363 close to exactly zero.** A count of successful arm decodes
+would be near-circular on its own — the walker reads the declared width to find
+the arm at all. What is not circular is that the body *containing* it then
+consumes exactly: a wrong arm width displaces everything after it, and in all
+five of these structures there is always something after it.
+
+`enhanced_digital_` is the arm that gains most. It had rested on **four** bodies
+and a subtraction; it now closes **36** bodies across four operations. And the
+four zero rows are zero across the whole corpus rather than across a sample, so
+"type system only" is a measured negative rather than an artefact of the 60.
 
 **All nine arms are pinned, and the last four came free with a validation
 attached.** The arm types are declared *inside* `Alarm_object` and were lost by
 the catalog's flattening (§10.1); read back out of the type system they size to
 `0, 38, 42, 47, 48, 55, 50, 16, 7` in tag order. What makes that usable rather
-than merely available is that **every one of the five widths already measured on
-the wire reproduces exactly** — including `enhanced_digital_` at 48, which had
-rested on four bodies and a subtraction and was labelled thin here for that
-reason. Five agreements out of five, and the four remaining arms follow from the
-same source. [W][S]
+than merely available is that **every one of the five widths measured on the
+wire reproduces exactly** — including `enhanced_digital_` at 48, which was
+labelled thin here when it rested on four bodies and a subtraction, and which
+the table above now shows closing 36 bodies across four operations. Five
+agreements out of five, and the four remaining arms follow from the same
+source. [W][S]
 
 **A fourth arm, and it is not anchored the way the first three are.** The
 `0x0982 UPL_ALL_ALARM_SETUP` and `0x0983 UPL_ALL_ALARM_MODE` responses both end
@@ -7768,7 +7787,7 @@ Worked examples (sanitized): a normal sensor `OATEMP.BN`, value `42 9b 62 3a` (�
 
 **`control_status` (+1) can be read, and the reading checks itself.** The type system names this byte's enumeration `0 remote / 1 tool_override / 2 by_priority / 3 config_only / 4 input_only / 5 manual_override / 6 undefined` (Appendix A; §11.3.1 for what `manual_override` means to an operator). Set that against the two values this corpus characterises *from the wire alone* — `0x02` on a point under an active operator command, `0x04` on a normal analog input — and both land on the name that describes exactly that condition: `by_priority` for a point held by a command priority, `input_only` for an input. The wire reading and the vendor's name for it were arrived at separately and agree, which is worth more than either alone. The other three observed values follow: `0x00` `remote` on a normal panel-controlled output, `0x03` `config_only`, `0x06` `undefined`. [W][S]
 
-**`alarm_state` (+8) and `alarm_priority` (+9) are declared, and this corpus does not exercise them.** Those are two different statements and an earlier edition of this section ran them together, calling the *encoding* open when only the *observation* was missing:
+**`alarm_state` (+8) and `alarm_priority` (+9) are declared; the corpus exercises one of them barely and the other not at all.** Those are two different statements and an earlier edition of this section ran them together, calling the *encoding* open when only the *observation* was missing:
 
 | byte | enumeration | values |
 |---|---|---|
@@ -7777,7 +7796,7 @@ Worked examples (sanitized): a normal sensor `OATEMP.BN`, value `42 9b 62 3a` (�
 
 Both are tabulated in full in Appendix A. What is still open is narrower than it was: **no point in this corpus was in a true hi/lo-limit alarm.** But **`alarm_state` has been seen non-zero**, which an earlier edition denied on the strength of the 60-body sample: walking all **120,763** `0x0274` pushes finds `alarm_state` = **1** (`alarm`) on **9** of them. So the generic alarm state is wire-confirmed; `2` `high_alarm`, `3` `low_alarm` and `4` `trouble` are not, and `alarm_priority` is **0 on all 120,763** — the runtime priority genuinely never asserts here (§13.2 explains why: a configured band is 1–6, a point not in alarm reports 0).
 
-The same full walk widens `control_status` to **six** of its seven values — `0` ×77,863, `1` ×32, `2` ×1,291, `3` ×99, `4` ×41,471, `6` ×7 — where the sample showed five. Only `5` `manual_override` is unobserved.** A single `0x0274` push from a point sitting in a limit alarm would confirm the mapping; nothing about it is unknown in the meantime. [S][OPEN]
+The same full walk widens `control_status` to **six** of its seven values — `0` ×77,863, `1` ×32, `2` ×1,291, `3` ×99, `4` ×41,471, `6` ×7 — where the sample showed five. Only `5` `manual_override` is unobserved. A single `0x0274` push from a point sitting in a limit alarm would confirm the mapping; nothing about it is unknown in the meantime. [S][OPEN]
 
 ### 12.4 Command priority (carried in the COV payload)
 
