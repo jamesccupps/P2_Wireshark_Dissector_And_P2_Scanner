@@ -367,7 +367,7 @@ constant across it cannot be told from a protocol constant by it.
   wrong. It is checked but is not a plain equality test (Appendix D item 8).
 - The **asserted values** of the alarm/flag bytes in a COV push — this site's
   alarms were quiet throughout (§12.3.3).
-- The **ten `All_points` arms** this site does not run (§8.5). A decoder built
+- The **nine `All_points` arms** this site does not run (§8.5). A decoder built
   to this document will meet them at a site that does.
 - **Sub-opcode** semantics, and the **heartbeat-miss count** that declares a
   peer failed (Appendix D items 5, 2).
@@ -5670,9 +5670,11 @@ The twelve bodies that do not close are all points named `test*`, and they fail
 for one reason: a `TEXT_` whose `textType` is `0x00` rather than `0x01`
 (§8.1). [W]
 
-Six of the sixteen arms are wire-observed here — `ldi`, `ldo`, `lai`, `lao`,
-`l2sl` and `lenum`. The remaining tag values are definitional from the enum, but
-their bodies have not been seen at this site. [S]
+Seven of the sixteen arms are wire-observed here — `ldi`, `ldo`, `lai`, `lao`,
+`l2sl`, `lenum` and `lpaci`, the last of which carries only **two** bodies in
+the whole corpus and none at all in the analysis sample (§1.4.1.1, §8.5). The
+remaining tag values are definitional from the enum, but their bodies have not
+been seen at this site. [S][W]
 
 **The same rule, checked on a second CHOICE.** `Alarm_object`'s nine arms —
 `no_alarming`, `std_digital`, `std_single_analog`, `std_analog`,
@@ -6912,7 +6914,7 @@ The ~30 structures above cover the read/command/COV core, the firmware/identity 
 
 **On "the exact byte offsets of an `All_points` arm", which an earlier edition left open.** The question has no answer, and not for want of evidence: **no arm of `All_points` has a fixed width.** Every one of the sixteen contains at least one variable-length string, so absolute byte offsets do not exist for any of them, on any panel, in any capture. What exists is field order plus a width for every scalar — and since the enum-base pass pinned the last 31 of those (§10.9), order-plus-widths *is* the packing. A decoder walks the fields and arrives at the right byte; it cannot index to a constant offset, and no capture would let it. State that as a property of the encoding rather than as a gap. [S]
 
-The two things the earlier text asked for both arrived, which is worth recording next to the retraction. **Codec-level evidence**: the vendor's own encoders give width, byte order and string mode for 120 layouts (§10.4.6, §6.8). **Measured interiors**: §8.5 confirms six of the sixteen arms to the byte from the wire, and §10.4.4 now gives all nine `Alarm_object` arms field by field from the catalog, with the three that were independently wire-measured agreeing. What remains genuinely unmeasured is narrower and is stated where it belongs — ten `All_points` arms this site does not run (§8.5), and the alarm band's asserted values (§12.3.3). [W][S][C]
+The two things the earlier text asked for both arrived, which is worth recording next to the retraction. **Codec-level evidence**: the vendor's own encoders give width, byte order and string mode for 120 layouts (§10.4.6, §6.8). **Measured interiors**: §8.5 confirms six of the sixteen arms to the byte from the wire (a seventh, `lpaci`, is *observed* but its interior width is still narrowed only to `{9, 12}` — being exercised and being pinned are different things), and §10.4.4 now gives all nine `Alarm_object` arms field by field from the catalog, with the three that were independently wire-measured agreeing. What remains genuinely unmeasured is narrower and is stated where it belongs — ten `All_points` arms this site does not run (§8.5), and the alarm band's asserted values (§12.3.3). [W][S][C]
 ## 11. Point Model
 
 The point is the atomic data object of a P2 system. Every value an operator reads or commands, every input a control program references, every quantity a trend logs, resolves to a point. This section specifies the logical point taxonomy, how a logical point decomposes into physical hardware terminations, how the FLN device layer self-describes its points, and the analog/enumerated scaling model. The runtime value carried for a point on the wire is specified in §12 (COV); the alarm attributes are specified in §13.
@@ -7801,7 +7803,10 @@ Worked examples (sanitized): a normal sensor `OATEMP.BN`, value `42 9b 62 3a` (�
 
 > **[W/F — values pinned; the alarm band is declared but unobserved here]** The 10-byte trailing block's **position, size, and field order are established** (the `Annunciate_request` ASDU defines fields #3–#12, exactly ten one-byte fields follow the value, and that fits the wire bit-for-bit). **The controller's own encoder confirms it independently:** the function that serialises this body emits `u16 | TEXT_ | TEXT_ | f32 | ` and then **exactly ten calls to the one-byte write primitive**, consecutively, with nothing between them — so "ten one-byte fields after the value" is not an inference reconciling a schema against a byte count, it is what the panel is compiled to write. [F] Newer command/abnormal-state captures confirm the **first two bytes' asserted values**: `point_priority` (+0) ∈ {`0x00` NONE, `0x20` EMER, `0x23` OPER} tracking who holds the point (`0x20`/emer seen on BACnet-integration points commanded to 1.0), and `control_status` (+1) observed taking `{0x00, 0x02, 0x03, 0x04, 0x06}` (e.g. `0x02` when the point is under an active operator command, `0x04` on a normal analog input). A failed sensor asserts a flag byte in the OOS/failed region (+2..+8). [W]
 
-**`control_status` (+1) can be read, and the reading checks itself.** The type system names this byte's enumeration `0 remote / 1 tool_override / 2 by_priority / 3 config_only / 4 input_only / 5 manual_override / 6 undefined` (Appendix A; §11.3.1 for what `manual_override` means to an operator). Set that against the two values this corpus characterises *from the wire alone* — `0x02` on a point under an active operator command, `0x04` on a normal analog input — and both land on the name that describes exactly that condition: `by_priority` for a point held by a command priority, `input_only` for an input. The wire reading and the vendor's name for it were arrived at separately and agree, which is worth more than either alone. The other three observed values follow: `0x00` `remote` on a normal panel-controlled output, `0x03` `config_only`, `0x06` `undefined`. [W][S]
+**`control_status` (+1) can be read, and the reading checks itself.** The type system names this byte's enumeration `0 remote / 1 tool_override / 2 by_priority / 3 config_only / 4 input_only / 5 manual_override / 6 undefined` (Appendix A; §11.3.1 for what `manual_override` means to an operator). Six of the seven values occur here (counts below); **two of them can be
+characterised *from the wire alone*** — `0x02` on a point under an active
+operator command, `0x04` on a normal analog input — and both land on the name
+that describes exactly that condition: `by_priority` for a point held by a command priority, `input_only` for an input. The wire reading and the vendor's name for it were arrived at separately and agree, which is worth more than either alone. The other three observed values follow: `0x00` `remote` on a normal panel-controlled output, `0x03` `config_only`, `0x06` `undefined`. [W][S]
 
 **`alarm_state` (+8) and `alarm_priority` (+9) are declared; the corpus exercises one of them barely and the other not at all.** Those are two different statements and an earlier edition of this section ran them together, calling the *encoding* open when only the *observation* was missing:
 
