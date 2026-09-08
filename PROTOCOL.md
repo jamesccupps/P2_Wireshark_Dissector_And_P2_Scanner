@@ -210,11 +210,26 @@ Every non-trivial claim carries an inline tag, at the end of the sentence or in 
 |---|---|
 | **[W]** | **Wire-verified.** Directly observed in a packet capture or opcode census of live P2 traffic. Ground truth for byte-level claims. |
 | **[S]** | **Struct/metadata-derived.** From the protocol's own type system — the function-code enumeration, the ASDU body-structure definitions, and the value enums (priorities, point types, COV masks, native types, node states, etc.). Definitional truth for names, field order, and constant values. |
-| **[F]** | **Firmware-attested.** The value or behavior is carried in a controller firmware image itself, rather than in a supervisor-side binary. Stronger than [S] for the question *does a panel actually implement this*, because [S] describes only what a supervisor knows how to ask for. |
+| **[F]** | **Firmware-attested.** The value or behavior is carried in a controller firmware image itself, rather than in a supervisor-side binary. Stronger than [S] for the question *does a panel actually implement this*, because [S] describes only what a supervisor knows how to ask for. **The images are not read out of panels** — see the note below. |
 | **[C]** | **Codec-attested.** Read out of the vendor's own compiled P2 codec — the encoder or decoder that lays bytes down, supervisor side. Definitive for field width, byte order, padding and string encoding, because the arithmetic is in the instruction stream. Weaker than [F] for *does a panel implement this*, and weaker than [W] because a link the codec serves may never have been captured. |
 | **[D]** | **Doc-sourced.** Taken from vendor help text, manuals, or templates. Reliable for behavior, topology, timing, and semantics — but **not** for byte-level wire layout. |
 | **[I]** | **Inferred / synthesis.** Reasoned from one or more of the above. |
 | **[OPEN]** | **Not yet confirmed.** A specific gap that needs a capture or a live test to close; flagged explicitly rather than papered over. |
+
+**Where the `[F]` images come from, since the tag invites the wrong guess.** They
+are **not** extracted from a running panel, and nothing here depends on being
+able to do that. Controller firmware ships inside the supervisor's own
+installation media, because that is how a supervisor pushes an upgrade to a
+panel in the first place — the images sit in the installer, and an
+administrative extraction of it (`msiexec /a` on the Insight distribution, for
+example) writes them to disk as ordinary files alongside the panel-side opcode
+tables. Any owner-operator with their own media has the same access; no panel is
+touched and no protocol path is involved. The P2 wire itself carries **no
+firmware-read operation**, and the panel's documented FTP service (§4, TCP/20–21)
+exists to push firmware and database files *to* a controller, not to dump the
+running image out of one. If you are trying to read an image off a panel to
+learn something about the protocol, you are solving a harder problem than you
+need to.
 
 A field-layout table is tagged **[S]** when its field order and types come from the ASDU structure definitions, and **[W]** when the layout has additionally been confirmed on the wire. A behavioral claim tagged **[D]** must never be presented as a byte-level wire fact; where the byte offsets behind a documented behavior are not pinned, the gap is tagged **[OPEN]**.
 
