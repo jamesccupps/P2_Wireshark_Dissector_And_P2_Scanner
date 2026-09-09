@@ -1103,6 +1103,16 @@ A panel may alternatively host a BACnet MS/TP fieldbus in place of P1 (`Fln_type
 
 ### 4.6 The serial trunk is token-passing, and its parameters are named
 
+> **Nothing in this section is wire-verified, and it is the section a reader
+> with serial panels will reach for first.** This corpus is entirely native
+> P2/IP: **431,463 frames on TCP/5033 and zero on TCP/3001** (§4.2), so no
+> serial trunk and no AEM tunnel has ever been captured here. The token-passing
+> discipline and the parameter defaults below come from the driver's own
+> configuration surface, which is a good source for *what the parameters are*
+> and no source at all for *what the bytes look like*. The frame layout stays
+> **[OPEN]** (§4.5), and a capture from an RS-485 trunk or an AEM Channel 1
+> remains one of the most valuable things this document could receive. [S][W]
+
 The frame bytes remain open (§4.5), but the **medium-access discipline** is
 settled: the serial trunk driver is configured with a token hold time and a
 local node address, which is a token-passing MAC, not a master/slave poll.
@@ -7243,6 +7253,15 @@ An implementer parsing a .ptd must not assume a flat line-oriented text grammar;
 
 A panel hosts one or more **Field Level Networks (FLNs)** — RS-485 fieldbus sub-buses (P1, §4.4) carrying field controllers (TEC, UC, TCU, PXM, P1DXR, VFD; `FLN_Device_Type` enumerates the families). [S/D] Each FLN device runs an **application**, identified by an **application number**, that fixes the device's roster of points. [D]
 
+**The corpus reaches the edge of this model and stops.** `application_number` is
+decoded **291** times and takes three values — `0` plus the two spellings of the
+unset sentinel (§16.3.1) — while `fln_number`, `drop_number`, `device_type` and
+the revision fields are **not decoded anywhere** under those names. So the
+roster *concept* is wire-touched and the roster *fields* below are not: they
+come from vendor documentation, and this site runs one application on the FLN
+devices it exposes. An implementer building FLN discovery is working from the
+manual, not from anything confirmed here. **[OPEN]** [W][D]
+
 The subpoint index space is fixed by the controller class, and three slots have reserved meaning: [D]
 
 | Subpoint | Meaning | Tag |
@@ -7565,7 +7584,9 @@ as a vendor-calibrated constant rather than a physical one. **[OPEN]** [D]
 
 A sensor's signal range is usually not typed in. The tooling offers a fixed set
 of **standard input ranges**, and picking one fills in both the signal and the
-device span; these nine are the whole set: [D]
+device span; these nine are the whole set — **from the vendor's tooling, and not
+checkable from this corpus for the same reason as §11.5.1.1: the wire carries
+the converted engineering value (§12.3) and never the raw span**: [D]
 
 | # | Engineering (°F) | SI (°C) | Quantity |
 |---|---|---|---|
