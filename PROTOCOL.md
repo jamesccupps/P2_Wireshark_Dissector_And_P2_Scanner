@@ -891,6 +891,12 @@ The 24-hour tombstone and the auto-replication are why stale roster entries pers
 
 #### 3.6.1 Node states
 
+> **No node-state field is decoded anywhere in the corpus.** The states below are
+> the type system's, and the opcodes that would carry them — `0x0034
+> SET_NODE_STATE` and its siblings — appear in the panel firmware table and in
+> no capture (§10.7). Nothing here is contradicted by the wire; nothing is
+> confirmed by it either. **[OPEN]** [S][W]
+
 A node-table entry carries a state. The node-state vocabulary (the values an entry can hold, and the events that transition it) is the liveness taxonomy: [S]
 
 | State | Meaning | [tag] |
@@ -2315,6 +2321,14 @@ absolute guarantees. The ordering is the durable observation: pings and COV are 
 are mid-cost, and trend retrieval is the slowest by an order of magnitude over pings. [W]
 
 #### 7.2.1 Error classes (vendor AP2 error taxonomy)
+
+> **This taxonomy is not carried in a body.** A P2 error rides the direction byte
+> `0x05` with the code in the frame, not as a field inside a response body — the
+> corpus decodes essentially no error-typed body field. So the classes below are
+> the vendor's organising scheme for the codes, and the **wire-observed counts
+> for the codes themselves are in §7.2.2**, which catalogs all 42 with their
+> frequencies. Read the two together: this section for what a class means,
+> §7.2.2 for what actually happens. [S][W]
 
 The vendor codec defines a fixed set of AP2 error classes (C++ RTTI types in the codec, mirrored as
 named members in the managed type system). These are the definitional error categories; the wire
@@ -7918,6 +7932,13 @@ The panel also maintains a **COV cross-reference** (which peers are subscribed t
 
 #### 12.3.1 Field model
 
+> **Unusually for this document, every field below is heavily exercised.** All
+> fifteen are decoded on **120,763** `0x0274` bodies — the same count for each,
+> which is itself the check that the record is fixed-shape with no optional
+> members. Where other sections in this pass had to disclose that a mechanism
+> was never observed, this one is the opposite case and the reader can rely on
+> it. What the fields' *values* do and do not exercise is §12.3.2. [W]
+
 The body the panel pushes for each changed point is the `Annunciate_request` record. Its fields are the **complete dynamic state** of a point (the static definition attributes — name, descriptor, limits, slope/intercept, units, proof delay — are not carried; they come from the point-definition record, §11.4/§11.5). [S]
 
 | # | Field | Type | Meaning | Tag |
@@ -8334,6 +8355,16 @@ as **[OPEN]**.
 
 ### 14.3 Statement / keyword vocabulary
 
+> **Roughly half of this vocabulary appears in the programs this site runs.**
+> Across the **2,644** PPCL lines decoded from the wire, **35 of the 66**
+> keywords below occur — led by `IF` ×603, `THEN` ×599, `GOTO` ×446, `EQ` ×426,
+> `ON` ×372, `OFF` ×312. Thirty-one never appear, including every trigonometric
+> function, both `SSTO` forms, `TOD`/`TODMOD`, the alarm-limit words
+> `HLIMIT`/`LLIMIT`, and `AUTO`. That is a statement about **one site's
+> programs**, not about the language: an absent keyword is one nobody here
+> wrote, and a parser must still accept all 66. It does say which half of the
+> language a decoder will meet first. [W][S]
+
 PPCL statements fall into functional categories; the panel stores each statement with a **token byte** identifying the statement type. The complete token set is the 71-entry statement-type table (vendor enum `PPCL_statement_type`, members prefixed `WHOP*` = "what-opcode"); it is reproduced in full in the appendix (cross-ref Appendix — PPCL statement-type token table). [S] The functional grouping: [D/S]
 
 | Category | Statements (token name in parentheses where it differs from the keyword) | Tag |
@@ -8676,6 +8707,15 @@ Mode semantics: **DAY = occupied**, **NIGHT = the complement** (unoccupied). `TO
 The schedule day index that selects which day-class applies is the `Schedule_days` enum: `Sunday`=0 … `Saturday`=6, then `Replacement1`–`Replacement7` (values 7–13) for special/replacement (e.g. holiday-override) days. [S]
 
 ### 15.2 TOD opcodes (per-point time-of-day scheduling)
+
+> **Nothing in this section has been seen on the wire.** All **seventeen** TOD
+> opcodes carry **zero** bodies in the corpus — the whole per-point time-of-day
+> family is unexercised here. Field order and widths below are as reliable as
+> the type system that declares them, and **no panel in this corpus has been
+> shown to answer any of these opcodes**. Scheduling at this site is done
+> through the EQS family (§15.3) instead, which is heavily observed. Treat this
+> section as a specification to build against and test, not as confirmed
+> behaviour. **[OPEN]** [S][W]
 
 | Opcode | AP2 name | Operation | Tag |
 |---|---|---|---|
