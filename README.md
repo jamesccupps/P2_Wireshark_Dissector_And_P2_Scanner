@@ -13,16 +13,27 @@ equipment. This repository contains three things:
 The dissector is built and validated from wire captures; the opcode names are the
 protocol's AP2 function-code vocabulary.
 
+> **Unreleased — a correction.** The `u32` at frame offset 4 is a **header
+> length**, not a message class. It is `13 + the total bytes of the four routing
+> slots`, so it is a sum of node-name lengths and differs from site to site —
+> **compute it; never choose it**. Releases up to v2.8.2 described it as a class
+> taking six values in legacy/modern pairs chosen by a panel's firmware
+> generation, and told you to fingerprint a panel to pick one. That model is
+> withdrawn: `PROTOCOL.md` §6.2 has the field, §6.6 the withdrawal, §6.2.5 what
+> survives. The dialect probe and its cache are gone from the scanner, and every
+> connect is now the fast path.
+>
 > **v2.8.2 — the decode side.** A request may carry a **zero-length body** — 220
 > in the corpus do, and it is how a parameterless operation is encoded: the `u16`
 > opcode is the whole message. And the opcode's high byte is a **structural**
-> family band, not a descriptive one: the codec's command factory switches on
-> `opcode & 0xFF00`.
+> family band, not a descriptive one: the supervisor's AP2 command factory
+> switches on `opcode & 0xFF00`.
 >> Earlier releases are in the [changelog](CHANGELOG.md).
 
 Click a P2 packet and get:
 
-- **Frame header** — total length, message class, sequence, direction
+- **Frame header** — total length, header length (checked against the slots the
+  frame actually carries, and flagged on a mismatch), sequence, direction
 - **Routing slots** — the four NUL-terminated ASCII slots `[BLN, dst-node, BLN, src-node]`
 - **Opcode** — the 2-byte AP2 function code, labelled against the full
   name set; an opcode that isn't a defined function code shows as `unknown_0x….`
