@@ -150,7 +150,7 @@ KNOWN_OPCODES = {
     0x4640: "Identify",
 }
 
-# Full 37-code catalog per APOGEE_P2_SPEC.md §10.2; kept in sync with
+# Full 37-code catalog per PROTOCOL.md §7.2.2; kept in sync with
 # p2.lua's STATUS_ERRORS and p2_scanner._P2_STATUS_ERRORS.
 KNOWN_ERRORS = {
     0x0001: "no_memory_available (E1)",

@@ -1,7 +1,7 @@
 """
 firmware_registry.py — Known APOGEE P2 firmware builds and dialect lookup.
 
-Implements APOGEE_P2_SPEC.md §30 (Appendix F). The registry lets a P2
+Implements PROTOCOL.md §30 (Appendix F). The registry lets a P2
 client skip the dynamic dialect-detection probe (§11.2) when a panel's
 firmware build tag has already been parsed from a prior 0x010C SystemInfo
 response. The §11.2 probe costs ~2 seconds against modern panels that
@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Dict, Optional, Tuple
 
 
-# Known builds — see APOGEE_P2_SPEC.md §30.2 for the source table.
+# Known builds — see PROTOCOL.md §30.2 for the source table.
 #
 # Each entry:
 #   dialect      — "legacy" / "modern" / "n/a"
@@ -93,7 +93,7 @@ def classify_unknown_build(build_tag: Optional[str]) -> str:
     """Heuristic dialect classification for builds not in the registry.
 
     Used when a fresh panel returns an unlisted PME####/BME#### tag.
-    Per APOGEE_P2_SPEC.md §30.3 the 1253-1299 build-number gap is
+    Per PROTOCOL.md §30.3 the 1253-1299 build-number gap is
     treated as ambiguous, not interpolated — a hypothetical PME1275
     could be on either side of the dialect break.
 

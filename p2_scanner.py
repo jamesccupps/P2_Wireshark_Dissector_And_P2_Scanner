@@ -85,18 +85,14 @@ import firmware_registry  # build-tag cache: platform and string encoding, NOT f
 import p2_data            # compiled-in opcode / point-type / enum tables
 
 # ─────────────────────────────────────────────────────────────────────────────
-# A note on `APOGEE_P2_SPEC.md §N` citations throughout this file.
+# A note on `PROTOCOL.md §N` citations throughout this file.
 #
-# APOGEE_P2_SPEC.md is the internal working spec this tooling was built against.
-# It is NOT shipped in this repository, and its section numbering does NOT
-# correspond to the published PROTOCOL.md. Treat those citations as provenance
-# markers ("this constant came from a specific documented observation"), not as
-# links a reader can follow. The same applies to the occasional reference to
-# OPCODES.md (an internal opcode audit, since folded into PROTOCOL.md 9) and to
-# PUNCHLIST_REPO_HEALTH.md (an internal tracking document). Neither ships here.
+# They point at PROTOCOL.md in this repository, which is the complete and
+# self-contained reference for everything this scanner does. A citation marks
+# where a constant, width or convention is specified, so a reader can check the
+# code against the document and the document against their own traffic.
 #
-# The published, self-contained reference is PROTOCOL.md in this repo. Where a
-# claim here matters to a reader, the equivalent PROTOCOL.md section is:
+# The sections cited most often:
 #   frame layout / framing over TCP ......... §6.1
 #   msg_type is a header length .............. §6.2
 #   direction byte .......................... §6.3
@@ -154,7 +150,7 @@ P2_SITE = ""                     # Site name (free text, spaces allowed in Sieme
 # default, leave-an-audit-trail posture. The port suffix is the conventional
 # `<host>|<listen-port>` form; effective_scanner_name() derives it from the
 # active port. An operator who must present a specific identity can override
-# with --scanner-name. See APOGEE_P2_SPEC.md §9.3 for the slot-4 identity.
+# with --scanner-name. See PROTOCOL.md §6.4 for the slot-4 identity.
 _GENERIC_SCANNER_NAME = "P2SCAN-LAP|5033"
 SCANNER_NAME = _GENERIC_SCANNER_NAME
 
@@ -204,7 +200,7 @@ def effective_scanner_name() -> str:
 
 # Status-byte error code lookup (see P2Connection._parse_read_response).
 # These are the u16 BE codes that follow the direction byte 0x05 in error
-# responses. Full catalog of 37 codes per APOGEE_P2_SPEC.md §10.2; codes
+# responses. Full catalog of 37 codes per PROTOCOL.md §7.2.2; codes
 # observed on the wire most often (0x0003, 0x00AC, 0x0E15) are commented.
 _P2_STATUS_ERRORS = {
     0x0001: 'no_memory_available',               # E1     no memory for the record
@@ -391,7 +387,7 @@ def load_config(filepath: str) -> bool:
 #     out of (apps 2020-2027 are the historical VAV cooling/heating family)
 #
 # DO NOT add new applications here. New apps go in tecpoints.json upstream
-# (see PUNCHLIST_REPO_HEALTH.md H-32 for retirement rationale).
+# (retired: superseded by the opcode catalog in PROTOCOL.md §9.5).
 #
 # Each TEC has up to 99 subpoints. Slot 0 is reserved; 1-99 are subpoints.
 # Format: address -> (name, description, units, read_only)
@@ -880,9 +876,9 @@ class P2Message:
     OP_SYSINFO         = 0x0100  # firmware / model (legacy). Also the CONNECT-response opcode on PME1252 V2.8.10 — panels echo this in 0x2E body instead of 0x4640.
     OP_SYSINFO_COMPACT = 0x010C  # firmware / model (newer; 2-byte request)
     OP_ROUTING_TABLE   = 0x4634  # BLN routing-table announce/push (port-agnostic — observed on both 5033 and 5034)
-    OP_BULK_READ       = 0x4221  # bulk property read (constant 273-byte preallocated request body — see APOGEE_P2_SPEC.md §12.7 / §29.10. Distinct from 0x4220's 222-byte form.)
+    OP_BULK_READ       = 0x4221  # bulk property read (constant 273-byte preallocated request body — see PROTOCOL.md §10.8. Distinct from 0x4220's 222-byte form.)
     OP_BULK_WRITE      = 0x4222  # BulkPropertyWrite — the canonical opcode for SYST setpoint writes; 0x0240 against SYST returns 0x0E15
-    OP_PROPERTY_ECHO   = 0x0241  # SYST-scoped PropertyEcho / DefaultPropertyResolve — see OPCODES.md (May 2026 paired-response audit)
+    OP_PROPERTY_ECHO   = 0x0241  # SYST-scoped PropertyEcho / DefaultPropertyResolve — see PROTOCOL.md §9.5
     OP_STATUS_QUERY    = 0x0050  # leaks supervisor name (bare form) without authentication; useful cold-discovery primitive
     # ---- EBLN management set, 0x4620-0x4642 ------------------------------
     # Validated span 0x4620-0x4640. Names from the AP2 function enumeration,
@@ -957,7 +953,7 @@ class P2Message:
     # direction-dependent semantic. Prefer MARKER_VALUE_PUSH for new code.
     MARKER_COV = MARKER_VALUE_PUSH
 
-    # Bare-opcode session keepalives (APOGEE_P2_SPEC.md §9.13, §28.6).
+    # Bare-opcode session keepalives (PROTOCOL.md §7.3).
     # Panels emit these as 2-byte payloads with no direction byte and no
     # body — the opcode IS the payload. Distinct from request/response
     # framing; an in-flight read should not pair with these.
@@ -968,7 +964,7 @@ class P2Message:
         self.sequence = sequence
         self.payload = payload
         # is_response covers both success (0x01) and error (0x05) per
-        # APOGEE_P2_SPEC.md §8.3. Direction byte 0x00 is a request from
+        # PROTOCOL.md §6.3. Direction byte 0x00 is a request from
         # the peer or our own request; anything else is a response that
         # _recv_response should pair to the in-flight request. An earlier
         # version checked == 0x01 only, which silently filtered out error
@@ -1171,7 +1167,7 @@ class P2Connection:
         self.scanner_name = scanner_name if scanner_name is not None else effective_scanner_name()
         self.sock: Optional[socket.socket] = None
         # Start sequence at a random 24-bit value matching real Desigo behavior.
-        # APOGEE_P2_SPEC.md §5.2 / §8.4 + corpus analysis show real DCC
+        # PROTOCOL.md §6.5 + corpus analysis show real DCC
         # uses session-monotonic seqs in the millions; seq=0 / seq=1 is a clear
         # scanner fingerprint and may be rejected by stricter future firmware.
         self.sequence = secrets.randbits(24)
@@ -1367,7 +1363,7 @@ class P2Connection:
         """Receive a response paired to the expected request sequence.
 
         Pairs with a sliding-window tolerance, not strict equality, per
-        APOGEE_P2_SPEC.md §5.2 / §24.5. In busy sessions about 10% of
+        PROTOCOL.md §6.5. In busy sessions about 10% of
         request/response pairs show the panel's response sequence running
         1-17 behind the request sequence (never ahead) due to panel-side
         pipelining lag. Strict equality treats those as unrelated traffic
@@ -1545,11 +1541,11 @@ class P2Connection:
         # status group) must be 0x00. Byte +8 (comm_status) is INTENTIONALLY
         # NOT constrained — it's 0x00 for live and 0x01 for STALE, and an
         # earlier version of this predicate that required +8 == 0x00 silently
-        # filtered out every comm-faulted response (see APOGEE_P2_SPEC.md §15).
+        # filtered out every comm-faulted response (see PROTOCOL.md §12.3).
         #
         # Loop bound: marker (3 bytes) + 7-byte metadata + 4-byte float = 14 bytes,
         # so the highest valid `i` is len(payload) - 14, i.e. range stop = len - 13.
-        # Off-by-one trap (APOGEE_P2_SPEC.md §14.5):
+        # Off-by-one trap (PROTOCOL.md §12.3):
         # `len(payload) - 14` (one too small) misses the case where the float sits
         # at the very end of the payload with no trailing data — symptom is digital
         # points without a units TLV silently failing to parse.
@@ -1557,10 +1553,10 @@ class P2Connection:
             if not (payload[i]   == 0x01 and payload[i+1] == 0x00
                     and payload[i+2] == 0x00):
                 continue
-            # Sentinel shapes: see APOGEE_P2_SPEC.md §14.3.
+            # Sentinel shapes: see PROTOCOL.md §12.3.
             # Real value blocks have one of these patterns at +3..+6:
             #   `3F FF FF XX` — R1 ("quality flags" register), where XX
-            #                   varies on the wire. APOGEE_P2_SPEC.md
+            #                   varies on the wire. PROTOCOL.md
             #                   documents `3F FF FF FF` but the F7 variant
             #                   (and possibly others — the bit pattern of
             #                   byte +6 encodes quality flags) is also
@@ -3464,7 +3460,7 @@ def probe_p2_host(host: str) -> Optional[Dict[str, str]]:
         for seq, target_name in enumerate(probe_names, start=100):
             target = target_name.encode('ascii')
             routing = b'\x00' + net + b'\x00' + target + b'\x00' + net + b'\x00' + scanner + b'\x00'
-            # Trailer per APOGEE_P2_SPEC.md §9 — see _handshake()
+            # Trailer per PROTOCOL.md §7.3.1 — see _handshake()
             # in P2Connection for the byte layout.
             identity = (
                 b'\x46\x40' +
@@ -3596,7 +3592,7 @@ def _recv_one_frame(sock: socket.socket, max_payload: int = 65536,
 
     Replaces the older "recv-until-timeout" pattern in raw-socket call
     sites like get_node_info and enumerate_fln_devices. The frame layout
-    (APOGEE_P2_SPEC.md §4.4) puts a u32 BE total_length at offset 0, so we
+    (PROTOCOL.md §6.1) puts a u32 BE total_length at offset 0, so we
     can buffer to the exact length and avoid both truncation (slow links)
     and over-reading (multiple frames piggybacked from the panel).
 
@@ -3680,11 +3676,11 @@ def get_node_info(host: str, node_name: str) -> Optional[Dict]:
         b'\x01' + struct.pack('>H', len(net)) + net +
         # Trailer: separator + 3 flags + 5 reserved + 4-byte timestamp +
         # 2-byte session id (00 00 = panel-style) + trailing null = 16 bytes.
-        # See APOGEE_P2_SPEC.md §9 for the documented format.
+        # See PROTOCOL.md §7.3.1 for the documented format.
         b'\x00\x01\x01\x00\x00\x00\x00\x00\x00' +
         struct.pack('>I', int(time.time())) + b'\x00\x00\x00'
     )
-    # Random 24-bit seq matches real Desigo behavior — see APOGEE_P2_SPEC.md
+    # Random 24-bit seq matches real Desigo behavior — see PROTOCOL.md
     _hs_seq = secrets.randbits(24)
     if not _send_handshake(s, p2_frame(routing + identity, _hs_seq), host=host):
         s.close()
@@ -3695,13 +3691,13 @@ def get_node_info(host: str, node_name: str) -> Optional[Dict]:
     info_data = struct.pack('>H', 0x0100)
     # Random 24-bit seq avoids the seq=0/1/10 "scanner fingerprint" that
     # stricter future firmware may reject; matches the P2Connection
-    # convention (see APOGEE_P2_SPEC.md §5.2 / §8.4).
+    # convention (see PROTOCOL.md §6.5).
     _info_seq = secrets.randbits(24)
     msg = p2_frame(info_routing + info_data, _info_seq)
 
     try:
         s.sendall(msg)
-        # Buffer to the frame's exact total_length per APOGEE_P2_SPEC.md §4.4
+        # Buffer to the frame's exact total_length per PROTOCOL.md §6.1
         # instead of the older "read until timeout" pattern. The old pattern
         # truncated on slow links (fragmented frames could time out mid-read)
         # and over-read when the panel piggybacked a push frame onto the
@@ -3795,11 +3791,11 @@ def enumerate_fln_devices(host: str, node_name: str) -> List[Dict]:
             b'\x01' + struct.pack('>H', len(net)) + net +
             # Trailer: separator + 3 flags + 5 reserved + 4-byte timestamp +
             # 2-byte session id (00 00 = panel-style) + trailing null = 16 bytes.
-            # See APOGEE_P2_SPEC.md §9 for the documented format.
+            # See PROTOCOL.md §7.3.1 for the documented format.
             b'\x00\x01\x01\x00\x00\x00\x00\x00\x00' +
             struct.pack('>I', int(time.time())) + b'\x00\x00\x00'
         )
-        # Random 24-bit seq matches real Desigo behavior — see APOGEE_P2_SPEC.md
+        # Random 24-bit seq matches real Desigo behavior — see PROTOCOL.md
         _hs_seq = secrets.randbits(24)
         if not _send_handshake(s, p2_frame(routing + identity, _hs_seq), host=host):
             s.close()
@@ -3808,7 +3804,7 @@ def enumerate_fln_devices(host: str, node_name: str) -> List[Dict]:
 
         cursor = "*"
         # Random 24-bit seq base avoids the scanner-fingerprint pattern
-        # (low constant values) — APOGEE_P2_SPEC.md §5.2 / §8.4. We still
+        # (low constant values) — PROTOCOL.md §6.5. We still
         # increment monotonically; only the starting point is randomized.
         seq = secrets.randbits(24)
 
@@ -3826,7 +3822,7 @@ def enumerate_fln_devices(host: str, node_name: str) -> List[Dict]:
             except (BrokenPipeError, ConnectionResetError, OSError):
                 break
 
-            # Buffer to exact frame length per APOGEE_P2_SPEC.md §4.4. The
+            # Buffer to exact frame length per PROTOCOL.md §6.1. The
             # previous "recv until short timeout" pattern truncated on slow
             # links (large enumerate responses can fragment across TCP
             # segments) and over-read when the panel piggybacked a push
@@ -4139,7 +4135,7 @@ def discover_devices_on_node(host: str, node_name: str,
             b'\x01' + struct.pack('>H', len(net)) + net +
             # Trailer: separator + 3 flags + 5 reserved + 4-byte timestamp +
             # 2-byte session id (00 00 = panel-style) + trailing null = 16 bytes.
-            # See APOGEE_P2_SPEC.md §9 for the documented format.
+            # See PROTOCOL.md §7.3.1 for the documented format.
             b'\x00\x01\x01\x00\x00\x00\x00\x00\x00' +
             struct.pack('>I', int(time.time())) + b'\x00\x00\x00'
         )
@@ -4772,7 +4768,7 @@ def _cold_probe(host: str, bln: str, scanner: str, node: str,
         b'\x01' + struct.pack('>H', len(bln_b)) + bln_b +
         # Trailer: separator + 3 flags + 5 reserved + 4-byte timestamp +
         # 2-byte session id (00 00 = panel-style) + trailing null = 16 bytes.
-        # See APOGEE_P2_SPEC.md §9 for the documented format.
+        # See PROTOCOL.md §7.3.1 for the documented format.
         b'\x00\x01\x01\x00\x00\x00\x00\x00\x00' +
         struct.pack('>I', int(time.time())) + b'\x00\x00\x00'
     )
@@ -4971,7 +4967,7 @@ def cold_discover_v0_14(host: str,
 
     Stage 2 — 0x0050 StatusQuery (chain_status_query=True, default):
         Calls _cold_status_query_probe with the learned BLN+panel and
-        a permissive scanner identity. Per APOGEE_P2_SPEC.md §22.6 the
+        a permissive scanner identity. Per PROTOCOL.md §17.2 the
         0x0050 response includes the real supervisor canonical name
         in the body after the SYST scope footer. This is the existing
         scanner primitive — `cold_discover_v0_14` simply chains to it.
@@ -5163,7 +5159,7 @@ def _cold_status_query_probe(host: str, scanner_name: str,
                              bln_hint: str = "", panel_hint: str = "",
                              timeout: float = 3.0
                              ) -> Optional[Dict[str, Any]]:
-    """`0x0050` StatusQuery one-round-trip bootstrap (APOGEE_P2_SPEC.md §22.6).
+    """`0x0050` StatusQuery one-round-trip bootstrap (PROTOCOL.md §17.2).
 
     Sends a Status Query and parses the response for the panel's identity.
     The panel echoes its own BLN in slot 0 and its node name in slot 3 of
@@ -5442,7 +5438,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
         print(f"\n  No Siemens PXCs identified.")
         return None
 
-    # Phase 2c: 0x0050 StatusQuery bootstrap (APOGEE_P2_SPEC.md §22.6).
+    # Phase 2c: 0x0050 StatusQuery bootstrap (PROTOCOL.md §17.2).
     # One round-trip per panel returns BLN + node name + supervisor identity
     # — far cheaper than the Cartesian attack in Phase 3. Strict-peer-list
     # panels reject this the same way they reject IdentifyBlock; we fall
@@ -6765,7 +6761,7 @@ def parse_alarm_report(body: bytes) -> Optional[Dict[str, Any]]:
 def parse_write_with_quality(body: bytes) -> Optional[Dict[str, Any]]:
     """Parse a 0x0240 WriteWithQuality body.
 
-    APOGEE_P2_SPEC.md §12.6 documents two distinct wire shapes selected
+    PROTOCOL.md §8.2 documents two distinct wire shapes selected
     by the scope byte at offset +7 (the separator after the scope-tag
     TLV). The scanner only generates reads, so this is parse-only for
     observed traffic.
@@ -6841,7 +6837,7 @@ def parse_routing_table(body: bytes) -> Optional[Dict[str, Any]]:
         (01 00 LL <name> 00 00 <u32 BE cost>)+
         00 00 00 00                     terminator
 
-    Per APOGEE_P2_SPEC.md §12.10, the first TLV MUST be `$paneldefault`
+    Per PROTOCOL.md §5.3, the first TLV MUST be `$paneldefault`
     (cost always 12) — it's the internal fallback/default-route anchor.
     A body whose first TLV is not `$paneldefault` is malformed and
     parsers SHOULD reject it rather than continue. Returns None on
