@@ -259,7 +259,7 @@ something all five share, it is still one site.
 frames, the direction split, the `msg_type` distribution — are over the whole
 corpus. **Body-level figures are not.** Bodies are cached for analysis at the
 **first 60 per opcode**, taken in capture order, giving **4,377 bodies out of
-444,547** actually on the wire. So a phrase like "60 of 60 bodies consume
+444,961** actually on the wire. So a phrase like "60 of 60 bodies consume
 exactly" means 60 *sampled* bodies, and for a high-volume opcode those 60 come
 from one moment in one capture: `0x0274 COV_ANNUNCIATE` alone carries 120,764.
 
@@ -2081,7 +2081,7 @@ begins, and the command object carries an explicit more-follows field, set on th
 segmenting path and cleared on the direct one. [S]
 
 **The ceiling is not exercised by anything we have captured**, and this is one
-of the few figures a full-corpus walk did not move. Across all **444,547**
+of the few figures a full-corpus walk did not move. Across all **444,961**
 bodies on the wire — not the analysis sample of §1.4.1.1 — **no body exceeds
 16,382 B and the largest is 1,570 B**, a `0x0295` trend response. The largest
 *declared* body is the 12,073-byte replication data store of §9.5. So a client
@@ -3173,7 +3173,7 @@ On the wire this serializes as the sub-structure's fields, then the name TLV(s),
 | `l2sl` | 13 | 13 |
 | `lenum` | 7 | 7 |
 
-**Seven of the sixteen arms are exercised; the other nine stay `[OPEN]`** — `looap`, `l2sp`, `looal`, `lfssl`, `lfssp`, `ldao`, `lfmsl`, `lfmsp`, `ppcl_lai`. An earlier edition said ten and listed `lpaci` among them; that was true of the 60-body sample and false of the corpus, which carries **two** `lpaci` bodies (§1.4.1.1). Walking all 444,547 bodies gives the arm counts as `lao` 13,499, `ldo` 5,068, `lai` 3,909, `ldi` 1,318, `lenum` 421, `l2sl` 146, **`lpaci` 2**. [W] That is the same ceiling §10.9 describes: this site runs six point types, and no amount of further reading of this capture set will produce a seventh. [W][OPEN] For the replication change-record framing the interior offsets remain **[OPEN]**; treat byte-offset claims there as inferred.
+**Seven of the sixteen arms are exercised; the other nine stay `[OPEN]`** — `looap`, `l2sp`, `looal`, `lfssl`, `lfssp`, `ldao`, `lfmsl`, `lfmsp`, `ppcl_lai`. An earlier edition said ten and listed `lpaci` among them; that was true of the 60-body sample and false of the corpus, which carries **two** `lpaci` bodies (§1.4.1.1). Walking all 444,961 bodies gives the arm counts as `lao` 13,499, `ldo` 5,068, `lai` 3,909, `ldi` 1,318, `lenum` 421, `l2sl` 146, **`lpaci` 2**. [W] That is the same ceiling §10.9 describes: this site runs six point types, and no amount of further reading of this capture set will produce a seventh. [W][OPEN] For the replication change-record framing the interior offsets remain **[OPEN]**; treat byte-offset claims there as inferred.
 
 For the byte-level grammar of each opcode's request and response ASDU, see §9; for the point-model structures (value blocks, multistate enum tables, FLN-device subpoints, slope/intercept scaling) these primitives compose into, see §11.
 ## 9. Function-Code (Opcode) Catalog
@@ -5132,7 +5132,7 @@ observation, not a protocol constant.
 body can consume to exactly zero remainder and still be read **one byte out** —
 the widths would sum correctly while every field sat in the wrong place. Two
 checks catch that and neither depends on the structure library being right about
-*meaning*, only about *position*. Both were run over all **444,547** bodies on
+*meaning*, only about *position*. Both were run over all **444,961** bodies on
 the wire, not the analysis sample (§1.4.1.1): [W]
 
 | check | result |
