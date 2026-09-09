@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — correction
+
+**The "message class" model is withdrawn.** Earlier entries in this file, and
+releases up to 2.8.2, described the `u32` at frame offset 4 as a message class
+taking six values in legacy/modern pairs chosen by a panel's firmware
+generation, and recommended fingerprinting a panel with `CABINET_DISPLAY`
+(`0x010C`) to pick the right one.
+
+That is wrong. **The field is a header length** — `13 + the total bytes of the
+four NUL-terminated routing slots` — so it is a sum of node-name lengths and
+differs from site to site. The six values are simply what one site's names
+summed to. **Compute it; never choose it.** A wrong value is dropped silently by
+the panel, which is why guessing appeared to work.
+
+Consequences already in the tree: the dialect probe, its per-host cache and the
+build-tag fast path are removed from the scanner; `p2.lua` shows the computed
+length beside the wire value and flags a mismatch; `firmware_registry.py` keeps
+only the platform/string-encoding role of the build tag. Those earlier entries
+are left as written, since a changelog is a record of what was believed at the
+time.
+
+Full account in `PROTOCOL.md` §6.2, with §6.6 recording the withdrawal and
+§6.2.5 listing which observations from the old model survive.
+
 Release notes for the P2 dissector, scanner and protocol reference.
 The current release is summarised at the top of [README.md](README.md).
 

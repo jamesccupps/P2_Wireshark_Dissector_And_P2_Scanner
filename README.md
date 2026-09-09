@@ -8,7 +8,7 @@ equipment. This repository contains three things:
 - **`p2.lua`** — a Wireshark dissector that decodes P2 on the wire (passive).
 - **`p2_gui.py` / `p2_scanner.py`** — a scanner that reads from panels (active; see the
   *P2 Scanner* and *Scope & ethics* sections below), with `firmware_registry.py` (shared
-  dialect cache) and `analyze_pcap.py` (offline opcode/error census over a capture).
+  panel build-tag cache) and `analyze_pcap.py` (offline opcode/error census over a capture).
 
 The dissector is built and validated from wire captures; the opcode names are the
 protocol's AP2 function-code vocabulary.
@@ -102,11 +102,14 @@ port it arrived on.
 
 ## Coverage at a glance
 
-- **Message classes** — a session / second-channel band: `0x29` / `0x2A` (peer carriers,
-  panel↔panel), `0x2E` / `0x2F` (legacy / modern second channel — identity +
-  DB-change/replication records + alarm prints), all carrying the `EBLN_PING 0x4640`
-  identity exchange; and a data band, `0x33` (legacy) / `0x34` (modern). The pairs are
-  chosen by a panel's firmware generation, not by direction.
+- **Header length, not message class** — the `u32` at offset 4 is
+  `13 + the total bytes of the four routing slots`, so its value is a sum of node-name
+  lengths and differs from site to site. **Compute it; never choose it.** An earlier
+  edition of this project read the six values it happens to take at one site as a set of
+  message classes in legacy/modern pairs, and that model is withdrawn — see
+  `PROTOCOL.md` §6.2, and §6.6 for the withdrawal. The traffic those values were
+  attached to is real and is selected by **opcode**: the `EBLN_PING 0x4640` identity
+  exchange, DB-change and replication records, and alarm prints.
 - **Opcodes** — 638 AP2 function codes are named (the 630-value vendor enum plus
   eight panel-side codes), matching the `PROTOCOL.md` §9.5 catalog one-for-one —
   the catalog is generated from the same table the tools ship, so they cannot drift. The common operations are byte-decoded; the rest show their name +
@@ -219,7 +222,9 @@ dissector: the dissector only *watches* traffic, the scanner *sends* requests.
 - `p2_scanner.py` — the scanner library/CLI. Self-contained: the FLN/TEC point catalog is
   embedded, so it runs as one file. (An external `tecpoints.json` is still honored if you
   drop one in, to update the catalog.)
-- `firmware_registry.py` — a small shared helper (per-panel firmware/dialect cache).
+- `firmware_registry.py` — a small shared helper (per-panel build-tag cache; the
+  build tag identifies the platform and its string encoding, and selects nothing
+  about framing).
 
 **Run it:**
 

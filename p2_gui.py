@@ -2172,15 +2172,14 @@ HELP_SECTIONS: List[Tuple[str, str]] = [
            "highlights every match in the current program. Comment lines "
            "(lines tagged 'C' in PPCL convention) render in green. Export "
            "all programs as a JSON archive."),
-    ("p", "Firmware-dialect note: the scanner auto-detects whether a PXC "
-          "speaks the legacy (firmware build PME1252 and earlier) or "
-          "modern (PME1300 and later) P2 wire dialect. If you used an "
-          "earlier version and some panels seemed unreachable, they "
-          "should now respond. The first connect to a modern panel is "
-          "about 2 seconds slower while the dialect is probed; "
-          "subsequent connects are fast. After the firmware build is "
-          "known it's cached in site.json and the probe is skipped on "
-          "every later connect. Nothing to configure."),
+    ("p", "A note if you used an earlier version: there is no firmware "
+          "\"dialect\", and the scanner no longer probes for one. The frame "
+          "field that model was built on is a header length, computed from "
+          "each frame's own routing slots rather than chosen from a set of "
+          "classes, so there is nothing to detect and nothing to configure. "
+          "Every connect is now the fast path — the ~2 second first-connect "
+          "delay older builds paid is gone. Panels that seemed unreachable "
+          "under a wrong guess should simply respond."),
 
     ("h2", "6. Scan history (View → Scan History…)"),
     ("p", "Every scan and sweep you run this session is archived in memory "
@@ -2217,11 +2216,11 @@ HELP_SECTIONS: List[Tuple[str, str]] = [
     ("p", "Cold-discover now bootstraps via a 0x0050 Status Query (spec "
           "§22.6) — one round-trip per panel returns BLN name, node name, "
           "and supervisor identity from both legacy and modern firmware. "
-          "Older builds of the scanner relied on legacy-dialect probes "
-          "only and could fail on all-modern (PME1300+) greenfield sites; "
-          "if you ever see that, point the scanner directly at one known "
-          "panel IP with -n NODEx — that path always auto-detects the "
-          "dialect."),
+          "Older builds of the scanner guessed this frame field from a "
+          "small set of values and could fail on sites whose node names "
+          "were a different length; it is now computed, so that failure "
+          "mode is gone. If a panel is still unreachable, point the "
+          "scanner directly at one known panel IP with -n NODEx."),
     ("p", "Once cold-discover has written a site.json, come back to the "
           "GUI and use File → Load Config… to pick it up."),
 
@@ -3451,20 +3450,12 @@ class MainWindow:
         self._load_config_if_present()
         self._start_polling()
 
-        # Note on first-connect latency for users new to this build. The
-        # scanner auto-detects legacy vs modern PXC wire dialect. With the
-        # firmware-build registry (firmware_registry.py) cached in
-        # site.json, known panels skip the probe entirely; only the
-        # first-ever connect to an unknown panel pays ~2s.
+        # The dialect probe this used to warn about is gone: msg_type is
+        # computed per frame from that frame's own routing slots, so there is
+        # nothing to detect and no first-connect penalty to explain.
         self.log.log(
-            "Scanner supports both legacy (PME1252) and modern "
-            "(PME1300) PXC firmware.",
-            level="info",
-        )
-        self.log.log(
-            "First connect to an unknown panel may take ~2s extra while "
-            "the dialect is probed; the build tag is then cached in "
-            "site.json so every later connect skips the probe.",
+            "Scanner supports PXC firmware across build generations "
+            "(PME1252 through PME1300 and later).",
             level="info",
         )
 

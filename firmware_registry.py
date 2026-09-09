@@ -1,108 +1,86 @@
 """
-firmware_registry.py — Known APOGEE P2 firmware builds and dialect lookup.
+firmware_registry.py — panel build-tag cache and platform identification.
 
-Implements PROTOCOL.md §30 (Appendix F). The registry lets a P2
-client skip the dynamic dialect-detection probe (§11.2) when a panel's
-firmware build tag has already been parsed from a prior 0x010C SystemInfo
-response. The §11.2 probe costs ~2 seconds against modern panels that
-silently drop the legacy probe; for a fleet of dozens of panels this is
-meaningful startup latency.
+A panel reports a firmware build tag in its `0x010C CABINET_DISPLAY` response
+(PROTOCOL.md §16.2). This module parses it, caches it per host so a repeat
+connection does not have to re-read the identity block, and records what is
+known about the handful of builds seen so far.
 
-The registry is non-exhaustive. Siemens does not publish a complete build
-catalog and OEM respins can carry identifiers not listed here. Clients
-SHOULD fall back to dynamic detection (§11.2) for any build not present.
+WHAT THE BUILD TAG IS GOOD FOR, and what it is not.
+
+It identifies the **platform**: which hardware family a panel is, and which
+string encoding its firmware uses. PROTOCOL.md §8.4 establishes that the
+RAD-50 / ASCII choice is a fixed property of a firmware revision rather than
+something negotiated per frame, so knowing the build is genuinely useful before
+you decode a name.
+
+It does **not** select a framing "dialect". An earlier version of this module
+implemented a legacy/modern dialect lookup keyed on the build tag, on the theory
+that `msg_type` 0x33 and 0x34 were class bytes chosen by firmware generation.
+That model is withdrawn: `msg_type` is a header length, computed as
+`13 + the total bytes of the four routing slots`, and it is not a choice at all
+(PROTOCOL.md §6.2, and §6.6 for the withdrawal). The dialect table, the
+negotiation function and the `msg_type` map that went with them are gone —
+nothing selects framing from a build tag, because framing is arithmetic.
+
+PROTOCOL.md §6.2.5 lists what did survive from that model, and the
+string-encoding property above is the part this module still serves.
+
+The registry is non-exhaustive: OEM respins carry identifiers not listed here,
+and an unlisted build is not an error. Callers should treat
+`classify_unknown_build()` as a hint for logging, never as a decode input.
 """
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 
-# Known builds — see PROTOCOL.md §30.2 for the source table.
-#
-# Each entry:
-#   dialect      — "legacy" / "modern" / "n/a"
-#   read_family  — opcode family for point reads on this build
-#   version      — human-readable firmware version (informational)
-#   build_date   — approximate build date (informational)
-#   notes        — anything specific to this build
+# Builds observed or documented so far. `notes` records what is actually known
+# about each one; several of these are wire observations that stand on their own
+# and were merely bundled into the withdrawn dialect record.
 KNOWN_BUILDS = {
     "PME1121": {
-        "dialect": "legacy",
-        "read_family": "0x0271",
         "version": "V2.8.5",
         "build_date": "~2012",
-        "notes": "Older P2 build; predates the dialect break.",
+        "notes": "Older P2 build.",
     },
     "PME1252": {
-        "dialect": "legacy",
-        "read_family": "0x0271",
         "version": "V2.8.10",
         "build_date": "Oct 2013",
-        "notes": "CONNECT-response uses 0x0100 in 0x2E body (§9.12); "
-                 "the highest known build before the dialect transition.",
+        "notes": "CONNECT response carries 0x0100 in the 0x2E body; the "
+                 "highest build seen in the older group.",
     },
     "PME1300": {
-        "dialect": "modern",
-        "read_family": "0x0220",
         "version": "V2.8.18",
         "build_date": "Sep 2019",
         "notes": "Final P2 release; adds Adaptive Control (LSM-ADAPT); "
-                 "CONNECT-response uses 0x4640 IdentifyBlock.",
+                 "CONNECT response carries the 0x4640 identity block "
+                 "(PROTOCOL.md §9.6).",
     },
     "BME1290": {
-        "dialect": "n/a",
-        "read_family": "bacnet",
         "version": "V3.5.2",
         "build_date": "~2019",
-        "notes": "BACnet firmware on identical PXC hardware; not "
-                 "addressable via this protocol's wire opcodes.",
+        "notes": "BACnet firmware on identical PXC hardware; not addressable "
+                 "via this protocol's wire opcodes.",
     },
 }
-
-
-# msg_type integers corresponding to the named dialects (per §5.1).
-# Callers that already use 0x33 / 0x34 as session_msg_type can resolve
-# the dialect string to the wire byte directly.
-DIALECT_MSG_TYPE = {
-    "legacy": 0x33,    # DATA
-    "modern": 0x34,    # HEARTBEAT
-    # "n/a" intentionally absent — BACnet panels don't speak this protocol.
-}
-
-
-def negotiate_dialect(build_tag: Optional[str]) -> Optional[Tuple[str, str]]:
-    """Fast-path dialect lookup by firmware build tag.
-
-    Returns (dialect, read_family) when the build is in the registry,
-    None when caller should fall back to §11.2 dynamic detection.
-
-    A BACnet-family build (BME####) returns ("n/a", "bacnet") so callers
-    can recognize the panel is unreachable via this protocol without
-    paying the probe cost.
-    """
-    if build_tag is None:
-        return None
-    tag = build_tag.strip()
-    entry = KNOWN_BUILDS.get(tag)
-    if entry is None:
-        return None
-    return entry["dialect"], entry["read_family"]
 
 
 def classify_unknown_build(build_tag: Optional[str]) -> str:
-    """Heuristic dialect classification for builds not in the registry.
+    """Best-effort family/generation hint for a build not in the registry.
 
-    Used when a fresh panel returns an unlisted PME####/BME#### tag.
-    Per PROTOCOL.md §30.3 the 1253-1299 build-number gap is
-    treated as ambiguous, not interpolated — a hypothetical PME1275
-    could be on either side of the dialect break.
+    For logging only. Nothing in the decode path may branch on this — the
+    protocol does not vary by build in any way this tool relies on.
 
     Returns one of:
-      "legacy"          — PME with build number <= 1252
-      "modern"          — PME with build number >= 1300
-      "not_applicable"  — BME (BACnet firmware family)
-      "unknown"         — PME in the 1253-1299 gap, or unrecognized
-                          prefix (caller should use dynamic detection)
+      "older"     — PME with build number <= 1252
+      "newer"     — PME with build number >= 1300
+      "bacnet"    — BME, the BACnet firmware family; not reachable over P2
+      "unknown"   — PME in the 1253-1299 range, or an unrecognized prefix
+
+    The 1253-1299 range is reported as unknown rather than interpolated. No
+    build in it has been observed, so placing it on either side would be a
+    guess presented as a fact.
     """
     if not build_tag:
         return "unknown"
@@ -114,23 +92,22 @@ def classify_unknown_build(build_tag: Optional[str]) -> str:
         except ValueError:
             return "unknown"
         if num <= 1252:
-            return "legacy"
+            return "older"
         if num >= 1300:
-            return "modern"
-        return "unknown"  # 1253-1299 gap — don't extrapolate
+            return "newer"
+        return "unknown"          # 1253-1299 — unobserved, do not extrapolate
     if tag.startswith("BME"):
-        return "not_applicable"
+        return "bacnet"
     return "unknown"
 
 
 def parse_build_tag(model_string: Optional[str]) -> Optional[str]:
     """Extract the PME####/BME#### build tag from a 0x010C response string.
 
-    The 0x010C SystemInfo response carries the build tag in a TLV that
-    Siemens internally labels "panel model" but holds the firmware-build
-    identifier — e.g. "PME1252 " or "PME1300 " (trailing space preserved).
-    Strips whitespace, validates the PME/BME prefix, and returns just the
-    canonical 7-character form (prefix + 4 digits) or None.
+    The 0x010C response carries the build tag in a TLV labeled "panel model"
+    that actually holds the firmware-build identifier — e.g. "PME1252 " or
+    "PME1300 " (trailing space preserved). Strips whitespace, validates the
+    PME/BME prefix, and returns the canonical prefix + digits form, or None.
     """
     if not model_string:
         return None
@@ -150,9 +127,9 @@ def parse_build_tag(model_string: Optional[str]) -> Optional[str]:
 # ─────────────────────────────────────────────────────────────────────────────
 # Per-host build-tag cache
 #
-# Populated by clients when they parse a 0x010C SystemInfo response from a
-# panel. Persisted by site.json loaders for cross-process reuse. Looked
-# up at handshake time so a known panel skips the §11.2 dialect probe.
+# Populated by clients when they parse a 0x010C response from a panel, and
+# persisted by site.json loaders for cross-process reuse, so a repeat connection
+# knows the platform without re-reading the identity block.
 # ─────────────────────────────────────────────────────────────────────────────
 
 _BUILD_TAG_CACHE: Dict[str, str] = {}
@@ -187,11 +164,10 @@ def load_build_tags(tags: Optional[Dict[str, str]]) -> None:
 
 
 def describe_build(build_tag: Optional[str]) -> str:
-    """Human-readable one-line description of a build for log output.
+    """Human-readable one-line description of a build, for log output.
 
-    Returns a string like:
-      "PME1300 (modern dialect, V2.8.18, Sep 2019)"
-      "PME9999 (heuristic: legacy/modern/unknown — not in registry)"
+      "PME1300 (V2.8.18, Sep 2019)"
+      "PME9999 (not in registry; looks newer)"
       "(no build tag)"
     """
     if not build_tag:
@@ -199,7 +175,5 @@ def describe_build(build_tag: Optional[str]) -> str:
     tag = build_tag.strip()
     entry = KNOWN_BUILDS.get(tag)
     if entry:
-        return (f"{tag} ({entry['dialect']} dialect, {entry['version']}, "
-                f"{entry['build_date']})")
-    classification = classify_unknown_build(tag)
-    return f"{tag} (heuristic: {classification} — not in registry)"
+        return f"{tag} ({entry['version']}, {entry['build_date']})"
+    return f"{tag} (not in registry; looks {classify_unknown_build(tag)})"

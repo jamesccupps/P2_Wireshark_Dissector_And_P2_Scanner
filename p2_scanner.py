@@ -1750,13 +1750,12 @@ class P2Connection:
             firmware_registry.cache_build_tag(self.host, build_tag)
             result['build_tag'] = build_tag
             if build_tag not in firmware_registry.KNOWN_BUILDS:
-                # Spec §30.5 limitation 4 — log unknown builds with full
-                # context so the registry can be extended.
+                # The registry is non-exhaustive; log unknown builds with full
+                # context so it can be extended.
                 print(f"  [INFO] Unknown firmware build {build_tag} on "
                       f"{self.host} — full revstring: model={result['model']!r}, "
                       f"firmware={result['firmware']!r}, "
-                      f"build_date={result['build_date']!r}. Heuristic "
-                      f"classification: "
+                      f"build_date={result['build_date']!r}. Looks "
                       f"{firmware_registry.classify_unknown_build(build_tag)}.")
         # Byte at offset ~0x68 of the response payload encodes the node number.
         # Offset varies slightly by firmware; search for the NODE name TLV and
@@ -3612,7 +3611,7 @@ def _recv_one_frame(sock: socket.socket, max_payload: int = 65536,
             return None
         buf.extend(chunk)
     total_len = struct.unpack('>I', bytes(buf[:4]))[0]
-    # Sanity-check: spec §4.4 minimum frame is 12 bytes (header only); maximum
+    # Sanity-check: PROTOCOL.md §6.1: minimum frame is 12 bytes (header only); maximum
     # is bounded by max_payload + 12. A length outside this window is a
     # framing failure — bail rather than try to recover.
     if total_len < 12 or total_len > max_payload + 12:
@@ -5221,7 +5220,7 @@ def _cold_status_query_probe(host: str, scanner_name: str,
 
         if data is None or len(data) < 14:
             continue
-        # Reject error-direction responses; spec §8.3.
+        # Reject error-direction responses; PROTOCOL.md §6.3.
         if data[12] == P2Message.DIR_ERROR:
             continue
 
@@ -6858,7 +6857,7 @@ def parse_routing_table(body: bytes) -> Optional[Dict[str, Any]]:
                     i += 1
                     continue
                 cost = struct.unpack('>I', body[i + 3 + L:i + 3 + L + 4])[0]
-                # First-TLV invariant — must be $paneldefault per spec §12.10.
+                # First-TLV invariant — must be $paneldefault per PROTOCOL.md §5.3.
                 # Reject malformed frames rather than parse them as topology.
                 if not entries and name != '$paneldefault':
                     return None
@@ -7041,8 +7040,17 @@ def listen_for_push_notifications(port: int = 5033, duration: Optional[int] = No
                             else:
                                 # dir_byte == 0x01 — success response; payload, no opcode.
                                 event['event'] = 'response'
-                        elif msg_type in (P2Message.TYPE_CONNECT, P2Message.TYPE_ANNOUNCE):
-                            event['event'] = '2ndch_legacy' if msg_type == P2Message.TYPE_CONNECT else '2ndch_modern'
+                    else:
+                        # The routing header did not parse. Earlier releases
+                        # guessed "2nd-channel identity" here from msg_type,
+                        # via TYPE_CONNECT/TYPE_ANNOUNCE constants that no
+                        # longer exist -- this branch raised AttributeError
+                        # whenever it was reached. msg_type is a header length
+                        # (PROTOCOL.md 6.2) and classifies nothing, so record
+                        # the frame as unparsed rather than mislabel it. The
+                        # identity exchange arrives as opcode 0x4640 through
+                        # the path above whenever the header does parse.
+                        event['event'] = 'unparsed'
 
                     if 'event' in event:
                         emit(event)
@@ -7157,8 +7165,9 @@ def _format_event_line(event: Dict) -> str:
         tslist = event.get('timestamps') or []
         return (f"{ts}  ALARM  {src:<12}  {event.get('point', ''):<20}  "
                 f"val={event.get('value', '?')}  {tslist[0] if tslist else ''}")
-    if ev in ('2ndch_legacy', '2ndch_modern'):
-        return f"{ts}  2NDCH  {src:<12}  (2nd-channel identity)"
+    if ev == 'unparsed':
+        return (f"{ts}  RAW    {src:<12}  routing header did not parse  "
+                f"(hdr_len={event.get('msg_type', '?')})")
     return (f"{ts}  {ev:<6} {src:<12}  "
             f"msg_type={event.get('msg_type', '?')} op={event.get('opcode', '?')}")
 

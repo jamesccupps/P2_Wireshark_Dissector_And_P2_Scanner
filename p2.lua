@@ -86,14 +86,15 @@
 --        every point in a multi-point COV and handles non-empty subpoint suffixes.
 --        (EBLN_PING baseTime is a Unix-epoch wall-clock, not a tick counter; event
 --        timestamps are 8 bytes incl. a day-of-week field — see PROTOCOL.md.)
---   2.2  message-class model corrected from fleet captures
---   2.2  Corrected from multi-panel + command captures:
---        * Message classes are legacy/modern PAIRS chosen by the panel's firmware
---          generation, NOT by direction: data 0x33(legacy)/0x34(modern); 2nd channel
---          0x2E(legacy)/0x2F(modern) carrying identity + DB-change/replication records
---          + alarm prints; peer carriers 0x29/0x2A (panel<->panel, mirror-only).
---          Fingerprint a panel via CABINET_DISPLAY 0x010C and pick the dialect from its
---          firmware generation rather than blind-probing.
+--   2.2  message-class model added -- WITHDRAWN, see below
+--   2.2  From multi-panel + command captures, later shown wrong:
+--        * The 0x29/0x2A/0x2E/0x2F/0x33/0x34 values were read as message classes in
+--          legacy/modern pairs chosen by firmware generation. They are not classes at
+--          all: the field is a HEADER LENGTH, 13 + the total bytes of the four routing
+--          slots, and those six values are simply what one site's node names summed to.
+--          Compute it per frame. See PROTOCOL.md 6.2 (and 6.6 for the withdrawal).
+--          The traffic is real and is selected by OPCODE: identity exchange, DB-change
+--          and replication records, alarm prints.
 --        * COV (0x0274) condition block: byte0 point_priority (0x23=OPER when commanded)
 --          and byte1 control_status (0x00/02/03/04/06) now wire-confirmed.
 --        * Sequence is per-(peer,channel) with gaps (not one global counter); responses
@@ -1899,12 +1900,7 @@ local f_tcp_stream = Field.new("tcp.stream")
 local resp_op = {}
 
 ------------------------------------------------------------------------ value strings
--- Message classes are legacy/modern PAIRS chosen by the panel's firmware generation
--- (fingerprint via CABINET_DISPLAY 0x010C), NOT by direction:
---   data channel:    0x33 legacy / 0x34 modern  (same opcodes + same f32 encoding)
---   2nd channel:     0x2E legacy / 0x2F modern  (identity + DB-change/replication records + alarm prints)
---   peer (mirror-only): 0x29 / 0x2A session carriers; both dominated by EBLN_PING
--- There is no MSG_CLASS table any more, and there is no set of valid values.
+-- There is no MSG_CLASS table, and there is no set of valid values.
 -- The u32 at offset 4 is a HEADER LENGTH: 13 + the total bytes of the four
 -- NUL-terminated routing slots (PROTOCOL.md §6.2). Earlier releases of this
 -- dissector labelled it "Message Class" and named six values as legacy/modern
