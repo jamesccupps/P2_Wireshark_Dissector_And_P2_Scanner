@@ -59,12 +59,12 @@ the management station is a peer node with an "Our Node" drop number
 "supervisor" because operators recognize it; the BLN tier has no formal
 "supervisor" in Siemens' model.
 
-Wire format derived from protocol analysis of network captures plus
-Siemens-published documents 125-3019 (APOGEE P2 ALN Field Panel User's
-Manual), 149-1006 (Configuring an APOGEE System on an IT Infrastructure),
-149-487 (PXC Modular for BACnet Networks spec), and 553-104 (PXC Compact
-Series Owner's Manual). No reverse engineering of Siemens binaries was
-performed.
+Wire format derived from protocol analysis of network captures, from the
+protocol's own type and opcode definitions, and from Siemens-published
+documents 125-3019 (APOGEE P2 ALN Field Panel User's Manual), 149-1006
+(Configuring an APOGEE System on an IT Infrastructure), 149-487 (PXC Modular
+for BACnet Networks spec), and 553-104 (PXC Compact Series Owner's Manual).
+PROTOCOL.md §1.4 records, per claim, which of those established it.
 """
 
 import socket
