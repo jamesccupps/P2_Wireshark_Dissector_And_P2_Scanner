@@ -8076,6 +8076,33 @@ The familiar operator-facing ladder is **OPER (35) > SMOKE (34) > EMER (32) > PD
 
 > Implementation caution: a field/application document's "COV limit" or "DISPLAY RES" describes the **local operator-display deadband** of a TEC, which explicitly does NOT affect networked values. Do not treat that local display setting as the network COV subscription resolution specified here. [D]
 
+**Measured: the report rate here is nowhere near one per 100 seconds, and an
+implementer must not size for it.** Every bullet above is `[D]`. The "roughly one
+report per 100 seconds" target is the one that is a number, so it was measured
+across all **120,763** `0x0274` pushes — 151 distinct points, **119,410**
+intervals between consecutive reports of the same point, computed within a
+capture so that gaps between captures are not counted: [W]
+
+| | |
+|---|---|
+| median interval | **0.62 s** |
+| p75 / p90 | 2.0 s / 28.8 s |
+| longest | 2,713 s |
+| **under 10 s** | **103,814 of 119,410 — 86.9%** |
+| in a generous 50–200 s band | 1,114 — **0.9%** |
+
+**A receive path provisioned for one report per point per 100 s would be
+under-built by about two orders of magnitude.** Two points alone account for
+55% of all pushes in the corpus.
+
+That does not refute the vendor's description, and the distinction matters.
+Dynamic COV is described as *auto-tuning a noisy point so it does not flood the
+network* — a governor that engages on the points that need it. What the corpus
+shows is that either it is not enabled here, or it is not engaging on points
+reporting sub-second, which two readings this evidence cannot separate.
+**[OPEN]** What the corpus does settle is the planning figure: **size for the
+observed rate, not the documented target.** [W][D]
+
 ---
 
 ## 13. Alarming
