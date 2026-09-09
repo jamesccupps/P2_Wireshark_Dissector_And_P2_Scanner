@@ -6537,6 +6537,22 @@ Only the site and BLN names can be compared across nodes.
 
 The EBLN host-table, MII, IP, and MAC display/configure ops (0x462D–0x463E) carry the corresponding `IP_Address_Settings` / `MII_Data` / `Mac_Address` sub-types from §10.5, and the host-table entry add/remove ops carry a host name + IP. The replication family (0x4633–0x4636, 0x464C) carries `Repl_Cmd_Type` (unknown/add/delete) records and node-roster grains (`Grain_Type` enum: node_list_entry, storage_node_db, user_acc_entry, hosttbl_entry, addresstbl_entry, …). [S]
 
+**Two of the three families above have never been seen on the wire, and the
+third has.** The distinction matters because `[S]` gives the same tag to a
+structure in daily use and one nobody has ever observed: [W]
+
+| structure | carried by | status |
+|---|---|---|
+| `Node_Choice` | `0x0034 SET_NODE_STATE` and the cabinet online/offline family | **never observed** — the opcode appears in the panel firmware table but in no capture |
+| `Cov_data` | `0x0275 XREF_COV_DISPLAY` | **never observed** — likewise, and no `Cov_mask` in the corpus sits in a `Cov_data` row; all 13,400 are on the two subscription requests (§12.2) |
+| replication grains | `0x4633`–`0x4636`, `0x464C` | **wire-observed**, extensively |
+
+So the BLN COV-share table and the node-state selector are described from the
+type system alone. Their field order and widths are as reliable as any other
+`[S]` claim, and **nothing here demonstrates that a panel answers either
+opcode** — which is a separate question, and the one an implementer is actually
+asking. **[OPEN]** [S][W]
+
 ### 10.8 Upload / PPCL / TEC / trend / alarm representatives
 
 **`AP2_UPL_ALL_POINT` request (0x0981)** — bulk point upload; body is a single `name_search : Name_search` (the class/range selector). Response reuses the `POINT_LOG_VALUE` response shape (§10.3), iterated. The whole `UPL_ALL_*` family (0x0982–0x09C3) follows the same pattern: a `Name_search`/`*_search` request, a per-record response paged via the `last_*` resume keys. [S][W]
@@ -8296,6 +8312,21 @@ The complete set of names a program may not use as a point name, grouped by
 role. This is the language's actual surface, and it is the authority for
 spelling — the token names of the table above are identifiers, not syntax. [D]
 
+**It constrains PPCL source, not the point database, and the difference is
+load-bearing for a client.** Checked against **360,839** name-like strings on
+the wire: 89 of the words below never appear as a name — and **`ALARM` does**,
+eight times, both as a point `name` and as a `last_name` enumeration cursor. The
+frames are ordinary panel and supervisor traffic, not this project's probes
+(§99.1). [W]
+
+A point called `ALARM` therefore exists and the panel enumerates it happily.
+What the rule means is that a *program* cannot write `ALARM` to refer to that
+point, because in PPCL the word is a keyword — the constraint lives in the
+language, not in the naming layer or on the wire. **A client must not reject or
+rewrite a name for being reserved**; it will reject names the panel itself
+serves. The list is a PPCL authoring constraint and should be applied only when
+generating or parsing PPCL source (§14). [W][D]
+
 | Role | Words |
 |---|---|
 | Flow | `IF` `THEN` `ELSE` `GOTO` `GOSUB` `RETURN` `LOOP` `WAIT` `SAMPLE` `ONPWRT` `TABLE` `DBSWIT` |
@@ -8665,6 +8696,17 @@ writes are not static tuning constants: they are the panel's learned state, and
 overwriting them discards what the zone has learned about its own thermal
 response. A tool that round-trips an SSTO configuration must preserve them
 byte-for-byte rather than re-deriving them from the setpoints. [D]
+
+**The opcodes are wire-observed; the adaptive claim is not, and cannot be tested
+here.** All four SSTO families appear in the corpus — `DBCHANGE_SSTO_*`,
+`UPL_ADDED_SSTO_*`, `UPL_ALL_SSTO_*` and `EQS_SSTO_SETUP_*` — and their bodies
+decode, so the structures above are `[W]`-supported. **The behavioural claim is
+not.** Demonstrating that the coefficients are *learned* would need the same
+zone's blocks read at two separated times and seen to differ; the corpus carries
+62 SSTO records in which most fields take only two distinct values, which is
+equally consistent with a couple of zones whose coefficients simply did not move
+during the capture window. So preserve them byte-for-byte on the strength of the
+vendor's description, not of anything measured here. **[OPEN]** [W][D]
 
 **The zone model those blocks hang off.** An EQS **zone** is a schedulable
 building resource — typically a room or a floor — and is composed of points plus
