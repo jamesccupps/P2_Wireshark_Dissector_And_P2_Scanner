@@ -7827,6 +7827,34 @@ AP2_COV_Disable_Request =  name_response : Name_response ,  cov_mask : Cov_mask
 
 `Cov_mask` is carried by exactly three structures — those two and `Cov_data`, the cross-reference record below. So on the P2 wire a subscription is defined by the **mask alone**: which transitions generate a report. The granularity enum is declared but unreachable through these opcodes, and is most likely a supervisor-internal or BACnet-side concept (the library does carry a separate `Bacnet_COV_Destination`). An implementer building a subscriber sets mask bits and nothing else. [S]
 
+**What is actually sent, and the warning in it.** The bit table above is the type
+system's; this is the wire. Every `Cov_mask` in the corpus — **13,400** of them,
+a full walk and not a sample — takes one of *three* values: [W]
+
+| opcode | mask | × | bits set |
+|---|---|---:|---|
+| `0x0271 COV_ENABLE` | `0x00FF` | **6,182** | all eight declared classes |
+| `0x0271 COV_ENABLE` | `0xFFFF` | 1,176 | all eight, plus bits 8–15 that are not declared |
+| `0x0273 COV_DISABLE` | `0x0000` | **6,042** | none |
+
+Two things follow, and neither is visible from the type system alone.
+
+**Selective subscription is unobserved.** Every enable in this corpus asks for
+**all eight classes**; not one asks for a subset. The bit table invites a client
+to subscribe to, say, `data` alone, and **nothing here demonstrates that a panel
+honours a partial mask** — an implementer who tries it may get everything, or
+nothing, and the document cannot say which. Build the all-classes subscription
+first, confirm it works, and treat any narrowing as untested. **[OPEN]** [W]
+
+**On disable the mask carries no information.** All 6,042 disables send zero, so
+the field is structurally present and semantically vestigial on that opcode —
+`0x0273` unsubscribes the named point wholesale. Do not expect to clear
+individual classes with it. [W]
+
+That both `0x00FF` and `0xFFFF` are accepted for "all" is worth noting for a
+panel implementer rather than a client one: the upper byte is undeclared, and
+the panel evidently tolerates it. A client should send `0x00FF`. [W][I]
+
 The panel also maintains a **COV cross-reference** (which peers are subscribed to which points), readable via `AP2_Xref_COV_Display` — its response is a count-prefixed array of `Cov_data = { destination_panel: u16, cov_mask }` rows, i.e. for each subscribing panel the mask it holds. [S]
 
 ### 12.3 The annunciate / value payload
