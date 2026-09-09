@@ -3,7 +3,7 @@
 `p2_data.py` names an operation and decodes an enum. This walks the operation's
 declared structure over the bytes and reports every field it contains, with its
 offset, width and value. It is the piece that lets a reader do what PROTOCOL.md
-10.9 says is possible for 444 of 455 operations.
+10.9 says is possible for all 457 operations that declare a structure.
 
     from p2_body import decode
     result = decode(0x0981, "rsp", body)

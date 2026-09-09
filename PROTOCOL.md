@@ -1077,11 +1077,11 @@ A panel may alternatively host a BACnet MS/TP fieldbus in place of P1 (`Fln_type
 
 ### 4.5 Open items — serial and field-bus framing
 
-> **[OPEN, PARTLY ANSWERED] Serial-BLN P2 link framing bytes.** Only the line parameters (8/N/1, baud tiers, trunk numbering) were established for the dedicated serial BLN. **The message layer above the framing is now recovered from controller firmware — see §6.8** — giving the address byte and its position, a compact operation encoding, a 253-byte cap, and the forwarding rule for a message addressed elsewhere. **The message layer is now attested from the supervisor end as well** — a supervisor-side codec builds the same encoding, agreeing with the panel on the group/ordinal pair and adding the ordinal's byte order (§6.8). [S] What is still unobserved is the **link** layer beneath it: start/sync delimiting, CRC/checksum, and the medium's segmentation, all of which a lower layer has already stripped before the code in §6.8 sees the message. The supervisor's link-layer component was examined for them and does not carry them: it is a transport — ports, partners, sequence numbers, a socket path and a modem path — and it hands the reference implementation's output down without prefixing a P2 header, so the three bytes preceding the group byte are added below it or supplied by the medium. [S] An AEM Channel-1 capture (TCP/3001) remains the way to see them, since the AEM tunnels the serial stream verbatim.
+> **[OPEN, PARTLY ANSWERED] Serial-BLN P2 link framing bytes.** Only the line parameters (8/N/1, baud tiers, trunk numbering) were established for the dedicated serial BLN. **The message layer above the framing is now recovered from controller firmware — see §6.8** — giving the address byte and its position, a compact operation encoding, a 253-byte cap, and the forwarding rule for a message addressed elsewhere. **The message layer is now attested from the supervisor end as well** — the reference implementation builds the same encoding on the supervisor side, agreeing with the panel on the group/ordinal pair and adding the ordinal's byte order (§6.8). [S] What is still unobserved is the **link** layer beneath it: start/sync delimiting, CRC/checksum, and the medium's segmentation, all of which a lower layer has already stripped before the code in §6.8 sees the message. The supervisor's link-layer component was examined for them and does not carry them: it is a transport — ports, partners, sequence numbers, a socket path and a modem path — and it hands the reference implementation's output down without prefixing a P2 header, so the three bytes preceding the group byte are added below it or supplied by the medium. [S] An AEM Channel-1 capture (TCP/3001) remains the way to see them, since the AEM tunnels the serial stream verbatim.
 
 > **[OPEN] FLN/P1 frame bytes.** The P1 fieldbus discovery transaction (P1WhoAreYou), addressing (drop + application number), physical layer (RS-485 2-wire), and baud are documented, but the P1 frame byte layout itself is unobserved. The on-wire P1 frame structure, the WhoAreYou request/response bytes, and the per-poll cadence/retry behavior require a P1-bus capture or a route-through capture from the BLN. **The route-through opcode is now named: `0x0313 AP2_P1_ROUTE`, with `0x0314` alongside it** (§9.1.1). Sixteen distinct field-device operations tunnel through `0x0313`, so a capture containing it carries P1 payloads inside a P2 frame — which is the cheapest route to these bytes, and needs no access to the RS-485 segment itself. Neither opcode occurs in any capture in the present corpus.
 
-> **[OPEN, LARGELY ANSWERED] P2 segmentation thresholds and reassembly rules.** The ~256-byte figure from vendor connection-test material is a *connection-test ping* size, **not** a maximum P2 data-packet cap — single P2 frames are observed with `total_len` up to ≈1,587 bytes (a ~1,530-byte body of packed records plus header+slots) in one response [W]. **The ceiling and the reassembly rule are now recovered from the supervisor's AP2 codec.** A segment buffer is **16,384 bytes**, of which the encoder is handed `buf+2` with a capacity of **16,382 bytes**; the two reserved bytes at `buf[0]` are the `u16` function code, which is why the wire carries the opcode immediately before the body and why `total_length` includes it. Reassembly is a cursor against a declared total: each mapped segment copies `n` bytes and advances the cursor, except the last, whose length is `total - cursor`; the sender therefore knows the total before it begins. The command object carries an explicit **more-follows** field, set on the segmenting path and cleared on the direct one. [S] **What is still open is the wire behaviour at the threshold.** No body in the corpus exceeds 16,382 B — the largest complete body is 1,570 B and the largest *declared* is 12,073 B — so the corpus is consistent with the ceiling without exercising it. Whether a result larger than one segment appears as two P2 frames, and what marks the continuation on the wire, needs a capture of an upload large enough to segment. [W][OPEN]
+> **[OPEN, LARGELY ANSWERED] P2 segmentation thresholds and reassembly rules.** The ~256-byte figure from vendor connection-test material is a *connection-test ping* size, **not** a maximum P2 data-packet cap — single P2 frames are observed with `total_len` up to ≈1,587 bytes (a ~1,530-byte body of packed records plus header+slots) in one response [W]. **The ceiling and the reassembly rule are now recovered from the reference implementation.** A segment buffer is **16,384 bytes**, of which the reference encoder is handed `buf+2` with a capacity of **16,382 bytes**; the two reserved bytes at `buf[0]` are the `u16` function code, which is why the wire carries the opcode immediately before the body and why `total_length` includes it. Reassembly is a cursor against a declared total: each mapped segment copies `n` bytes and advances the cursor, except the last, whose length is `total - cursor`; the sender therefore knows the total before it begins. The command object carries an explicit **more-follows** field, set on the segmenting path and cleared on the direct one. [S] **What is still open is the wire behaviour at the threshold.** No body in the corpus exceeds 16,382 B — the largest complete body is 1,570 B and the largest *declared* is 12,073 B — so the corpus is consistent with the ceiling without exercising it. Whether a result larger than one segment appears as two P2 frames, and what marks the continuation on the wire, needs a capture of an upload large enough to segment. [W][OPEN]
 
 ### 4.6 The serial trunk is token-passing, and its parameters are named
 
@@ -2074,8 +2074,8 @@ in the corpus has `total_len` = **1,622 bytes** — a **1,570-byte body** of pac
 maximum of 65,536 B is a stream-desynchronization artifact, not a real frame.) Large multi-record
 read/trend responses arrive as one large frame, not as a 256-byte-segmented exchange. [W]
 
-**The sender's ceiling, and the two reserved bytes.** The supervisor's AP2 codec
-allocates a **16,384-byte** segment buffer and hands its encoder `buf+2` with a
+**The sender's ceiling, and the two reserved bytes.** The reference implementation
+allocates a **16,384-byte** segment buffer and hands the reference encoder `buf+2` with a
 capacity of **16,382 bytes**. The two bytes it holds back at `buf[0]` are the
 `u16` function code, written after the body is encoded — which is exactly why the
 wire carries the opcode immediately before the body, and why `total_length`
@@ -2169,12 +2169,12 @@ not fit in a byte. **The ordinal is big-endian**, and the group byte precedes it
 directly. [S]
 
 **The pairing is attested from both ends.** Everything above is the panel's side.
-A supervisor-side codec builds the same encoding, and for group `0xE0` it emits
+The reference implementation builds the same encoding on the supervisor side, and for group `0xE0` it emits
 ordinals 256, 257, 258 and 259 — the same four the panel's `0xE0` table holds,
 plus a fifth, 260, that this panel generation does not implement. Two
 independent implementations for two different processors agreeing on four exact
 values in a 16-bit space is what makes the group/ordinal reading safe to build
-on. [S] The same codec shows that not every leading byte is a group selector:
+on. [S] The same implementation shows that not every leading byte is a group selector:
 some classes are followed by an ordinal, others by a fixed addressing prefix of
 their own, so a decoder must switch on the class byte before assuming an ordinal
 follows it. [S]
@@ -3118,7 +3118,7 @@ All P2/IP revisions carry plain ASCII in both the length-prefixed TLVs (§8.1) a
 
 String fields have encoding-dependent capacity budgets. Name fields (point name, node name) on RAD-50 platforms are constrained to roughly a 12-character budget (and ~30 for longer object-name fields); free-text fields such as a point **Description** run to roughly 60 ASCII characters. Concrete name-field limits used by the protocol model: a logical point name up to 15 characters (historically a 6-character field; shorter names interoperate everywhere), a point descriptor up to 12 characters (display-only), and an object/display name up to 30 characters. Node and BLN names also fall in the ~30-character band. These budgets are firmware-platform properties; an implementer should treat the larger limit as the worst case and not assume a fixed width. The ~15-character node-name truncation is consistent with the Base + Suffix decomposition of a system name (the name is split into a base and a suffix, with the base length-bounded). [D][I]
 
-**Codec-enforced byte maxima (cross-validated).** The ASCII serializer applies a fixed maximum byte length per string field, and the same caps recur across dozens of independent operation bodies — so they are reliable worst-case widths for an encoder, not per-opcode accidents. The dominant cap is **31 bytes (0x1F) for object / point / program-name fields** (seen on the command, COV, cabinet, EBLN, and enum families alike — it is by far the most common string cap; this is the byte width of the 30-character object-name field above, i.e. 30 usable characters within a 31-byte budget), with **13 bytes for a short descriptor or secondary name** (the 12-character descriptor above in its field budget), roughly **21 bytes for an operator credential / logon identity**, and a **free-text band of ~248–257 bytes** for message text, license strings, point descriptions, and PPCL program-line text. (This 31-byte object-name cap is distinct from the ≤15-byte **node**-name limit above — they are different fields: the node name is the access-gate identity in the routing slot / node-name table, while the 31-byte cap governs point, object, and program names inside the body.) An encoder SHOULD truncate to these maxima before framing; an over-length field is the most common reason a panel silently rejects an otherwise well-formed write. [D][I]
+**Implementation-enforced byte maxima (cross-validated).** The reference implementation applies a fixed maximum byte length per string field, and the same caps recur across dozens of independent operation bodies — so they are reliable worst-case widths for an encoder, not per-opcode accidents. The dominant cap is **31 bytes (0x1F) for object / point / program-name fields** (seen on the command, COV, cabinet, EBLN, and enum families alike — it is by far the most common string cap; this is the byte width of the 30-character object-name field above, i.e. 30 usable characters within a 31-byte budget), with **13 bytes for a short descriptor or secondary name** (the 12-character descriptor above in its field budget), roughly **21 bytes for an operator credential / logon identity**, and a **free-text band of ~248–257 bytes** for message text, license strings, point descriptions, and PPCL program-line text. (This 31-byte object-name cap is distinct from the ≤15-byte **node**-name limit above — they are different fields: the node name is the access-gate identity in the routing slot / node-name table, while the 31-byte cap governs point, object, and program names inside the body.) An encoder SHOULD truncate to these maxima before framing; an over-length field is the most common reason a panel silently rejects an otherwise well-formed write. [D][I]
 
 #### 8.4.4 Reserved characters — what a name may not contain, and why
 
@@ -3294,7 +3294,7 @@ catalog's values are reachable and the rest are not, which bounds what a peer
 can meaningfully send *to a supervisor*. And **falling inside a band is not the
 same as being handled**: the 603 defaulted opcodes reach a single address that
 sets an error rather than decoding a body, so a client that receives a success
-for one of them is talking to something other than this codec. [S][I]
+for one of them is talking to something other than this implementation. [S][I]
 
 The map is checked against an artifact that did not produce it: **all 97
 opcodes with a dedicated handler carry a name in the AP2 function-code
@@ -5149,7 +5149,7 @@ One position fits and it fits everything, so the six bytes read:
 00        BACnetMSTPALNSettings  tag 0 = noMSTPALN
 ```
 
-**The BACnet CHOICEs were never the problem.** What remains open is only what the one byte *means*; its position and its constancy are measured, and a decoder that skips one byte there reads the response completely. `p2_asdu.STRUCT_SKIPS` carries it and `p2_body.py` applies it, emitting it as a named `<undeclared>` field rather than stepping over it silently — all 60 now decode to 230 of 230. One caution while reading the result: `bacnet_ip_aln_choice` is declared `BOOLEAN_` and carries `3`, so this codec does not constrain a boolean to 0/1. [W][OPEN]
+**The BACnet CHOICEs were never the problem.** What remains open is only what the one byte *means*; its position and its constancy are measured, and a decoder that skips one byte there reads the response completely. `p2_asdu.STRUCT_SKIPS` carries it and `p2_body.py` applies it, emitting it as a named `<undeclared>` field rather than stepping over it silently — all 60 now decode to 230 of 230. One caution while reading the result: `bacnet_ip_aln_choice` is declared `BOOLEAN_` and carries `3`, so this implementation does not constrain a boolean to 0/1. [W][OPEN]
 
 **Where the whole corpus stands, with nothing hand-waved.** Four categories, and every body is in one of them: [W]
 
@@ -6312,7 +6312,7 @@ any point type other than a supply fan. Neither is needed to read the record.
 
 §10.4.1 shows that `All_points`' tag is an enum value and not a position. The
 obvious next question is whether that is peculiar to point types or true of every
-CHOICE in the protocol, and it is answerable: the vendor's codec selects an arm
+CHOICE in the protocol, and it is answerable: the reference implementation selects an arm
 by branching on the tag, so the numbering is stated in the code for every CHOICE
 it codes. It states it in four different shapes, and it took all four to finish
 the job:
@@ -7065,7 +7065,7 @@ The ~30 structures above cover the read/command/COV core, the firmware/identity 
 
 **On "the exact byte offsets of an `All_points` arm", which an earlier edition left open.** The question has no answer, and not for want of evidence: **no arm of `All_points` has a fixed width.** Every one of the sixteen contains at least one variable-length string, so absolute byte offsets do not exist for any of them, on any panel, in any capture. What exists is field order plus a width for every scalar — and since the enum-base pass pinned the last 31 of those (§10.9), order-plus-widths *is* the packing. A decoder walks the fields and arrives at the right byte; it cannot index to a constant offset, and no capture would let it. State that as a property of the encoding rather than as a gap. [S]
 
-The two things the earlier text asked for both arrived, which is worth recording next to the retraction. **Codec-level evidence**: the vendor's own encoders give width, byte order and string mode for 120 layouts (§10.4.6, §6.8). **Measured interiors**: §8.5 confirms six of the sixteen arms to the byte from the wire (a seventh, `lpaci`, is *observed* but its interior width is still narrowed only to `{9, 12}` — being exercised and being pinned are different things), and §10.4.4 now gives all nine `Alarm_object` arms field by field from the catalog, with the three that were independently wire-measured agreeing. What remains genuinely unmeasured is narrower and is stated where it belongs — ten `All_points` arms this site does not run (§8.5), and the alarm band's asserted values (§12.3.3). [W][S]
+The two things the earlier text asked for both arrived, which is worth recording next to the retraction. **Implementation-level evidence**: the reference encoders give width, byte order and string mode for 120 layouts (§10.4.6, §6.8). **Measured interiors**: §8.5 confirms six of the sixteen arms to the byte from the wire (a seventh, `lpaci`, is *observed* but its interior width is still narrowed only to `{9, 12}` — being exercised and being pinned are different things), and §10.4.4 now gives all nine `Alarm_object` arms field by field from the catalog, with the three that were independently wire-measured agreeing. What remains genuinely unmeasured is narrower and is stated where it belongs — ten `All_points` arms this site does not run (§8.5), and the alarm band's asserted values (§12.3.3). [W][S]
 ## 11. Point Model
 
 The point is the atomic data object of a P2 system. Every value an operator reads or commands, every input a control program references, every quantity a trend logs, resolves to a point. This section specifies the logical point taxonomy, how a logical point decomposes into physical hardware terminations, how the FLN device layer self-describes its points, and the analog/enumerated scaling model. The runtime value carried for a point on the wire is specified in §12 (COV); the alarm attributes are specified in §13.
@@ -7323,7 +7323,7 @@ Two cautions, both of which produce a decoder that looks correct on the bench:
   This was `[OPEN]` for want of a capture — `scale_`'s only carrier,
   `AP2_MEMBER_DESC_ADD_ANALOG` (0x4002), appears nowhere in the corpus and
   0x4010 is present as 19 requests with no reply. It did not need one. The
-  vendor's codec selects the arm by branching on the tag, and while `scale_` has
+  reference implementation selects the arm by branching on the tag, and while `scale_` has
   no encoder of its own, its parent inlines the selection: `tag == 0` branches to
   the `virtual_pt` arm and `tag == 1` to the block that reads `eng_units`,
   `eng_cov_limit`, `si_units` and `si_cov_limit` — the physical arm's four
@@ -7821,7 +7821,7 @@ type-specific additions — `polarity` and `minimum_on_time` / `minimum_off_time
 on the binary outputs, `priority_array` and `relinquish_default` on every
 commandable type, `min_pres_value` / `max_pres_value` / `resolution` on the
 analogs. **This is a second, independent check on §10.4.6's tag map**, which was
-recovered from the vendor's codec and validated against ASHRAE's object-type
+recovered from the reference implementation and validated against ASHRAE's object-type
 numbering: the arms carry the properties ASHRAE assigns to exactly those object
 types.
 

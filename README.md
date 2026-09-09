@@ -185,7 +185,7 @@ for the one-screen overview.
 
 ## Decoding a body into named fields
 
-`PROTOCOL.md` documents the body structure of 455 operations. Two modules make that
+`PROTOCOL.md` documents the body structure of 457 operations. Two modules make that
 machine-readable, so a tool does not have to guess at a body's shape:
 
 - **`p2_asdu.py`** — the structure catalog, generated and embedded: field order and type
