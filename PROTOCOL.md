@@ -7892,6 +7892,39 @@ The boolean and enum status fields (#4–#12 above) encode the point's **operati
 
 These are the semantic meaning of the per-point status the COV report conveys; `alarm_state` (normal/alarm/high/low/trouble) and `alarm_priority` ride alongside for points that are in alarm. [S]
 
+**Which of them an implementer will actually meet.** The taxonomy above is the
+type system's and the vendor's; this is the wire, over every `BOOLEAN_` in the
+corpus rather than a sample: [W]
+
+| state | field | true | of | |
+|---|---|---:|---:|---|
+| Failed | `failed` | **8,875** | 364,038 | the one an implementer will certainly meet |
+| Out-of-Service | `out_of_service` | **1,074** | 154,319 | on the COV push |
+| Operator-Disabled | `operator_disabled` | 50 | 129,972 | |
+| Alarm-by-Command | `commanded_to_alarm` | **3** | 129,972 | real, but barely — cf. §12.3.3's 9 alarms in 120,763 |
+| Program-Disabled | `program_disabled` | **0** | 129,972 | never asserted here |
+| Proofing | `proof_on` | **0** | 120,763 | never asserted here — but see below |
+| *(alarm detail)* | `in_trouble` | **0** | 9,209 | never asserted here |
+
+**Proofing is the one to read carefully.** The field this taxonomy names for it,
+`proof_on`, is false on **all 120,763** COV pushes. A *different* field,
+`proof_pending`, is true **124 times** in `Trend_data` records. So the proofing
+state does occur at this site, and the COV push is not where it shows up. An
+implementer rendering "Proofing" from `proof_on` alone will never display it;
+one reading trend records will. Whether that is a property of the protocol or of
+this site's configuration is **[OPEN]**. [W]
+
+**Three decodes are therefore untested.** `program_disabled`, `proof_on` and
+`in_trouble` are correctly *placed* — the bodies around them consume exactly, and
+§10.1's alignment checks pass — but no body has ever carried them non-zero here.
+Treat their rendering as unverified rather than confirmed. [W][OPEN]
+
+A cross-check falls out of the same walk and is worth recording: `highlight_enabled`
+and `autobye_enabled` are among **twenty** `BOOLEAN_` fields never true anywhere
+in the corpus, which is exactly what §16.1.3 predicts from the firmware — that
+the port encoder writes those two as literal constants. Two independent sources,
+same answer. [W][F]
+
 #### 12.3.3 Wire layout and the open offsets
 
 The `COV_ANNUNCIATE` (`0x0274`) body is now wire-confirmed. The body opens with a `count` (u16) of points reported, then, **per point**, a `name_response` (its three sub-fields, §8.5) followed by the value and condition block: a 2-byte `name_space` (observed constant `00 00` = system), the **name TLV** `01 00 <len> <point-name>`, an **empty `suffix` TLV** `01 00 00` (the §8.1 empty-string TLV — *not* a "value marker"; it is non-empty only for FLN subpoints, e.g. `01 00 09 "ROOM TEMP"`), then the present-value **`f32` big-endian**, then a **fixed 10-byte condition/priority block** carrying fields #3–#12 one byte each. The name TLV therefore begins at body offset **+4** (after `count` + `name_space`), not +2. [W]
