@@ -1298,6 +1298,15 @@ This is a **peer-liveness heartbeat group, not a discovery beacon**: a node does
 
 ### 5.3 Node-name-table replication (the self-organizing BLN)
 
+> **Heavily observed, with two gaps.** The pull path is exercised — `0x4634
+> REPL_PULL` carries **10,017** bodies, `0x4635 REPL_PULL_MORE` **130**, and
+> `0x4636 REPL_CHANGES` **180** — and the table's contents are visible:
+> `node_name` is decoded **209,957** times across **154 distinct** values, with
+> `grain_type` and `repl_cmd_type` on 1,421 records each. But `0x4633
+> REPL_NOTIFY` and `0x464C REPL_DIAG_NODELIST` carry **no bodies at all**, so the
+> *notification* half of the mechanism described below is type-system only while
+> the *pull* half is wire-confirmed. **[OPEN]** [W][D]
+
 BLN membership is carried in a **node-name table** (name ↔ IP, with state) that is **entered once on any one panel and auto-replicates to every panel on the BLN** [D]. Each panel continuously monitors every other peer and **temporarily disables communication to any peer that becomes unavailable**, resuming when the peer returns [D]. This is the application-layer membership model built on top of the EPing/multicast liveness layer — there is no central master; the table is the shared, replicated source of truth for "who is on this BLN and at what IP."
 
 The replication of shared/global data (the node-name table, plus alarm destinations, user accounts, state-text tables, etc.) runs on a notify + poll + cycle schedule with dead-node tombstoning:
@@ -3055,6 +3064,29 @@ stamp. [W][S]
 
 ### 8.4 String character encoding — RAD-50 vs ASCII
 String content inside a TLV (§8.1) is carried in one of two character encodings, selected **per firmware platform**, not per frame. The encoding in force is a fixed property of the device's firmware revision (`STRING_TYPE = RAD50 | ASCII`, keyed per platform class in the firmware revision library). A node uses one string encoding for its whole revision. [D]
+
+**Every node in this corpus is on the ASCII side of that switch, and a good
+deal of what it sends could not be RAD-50 at all.** Of **1,204,087** `TEXT_`
+strings decoded from the wire, **189,257 (15.7%)** contain at least one
+character RAD-50 cannot represent — its alphabet is 40 symbols: space, `A`–`Z`,
+`$`, `.`, digits, and one unused code. The blockers are not exotic: [W]
+
+| character | strings | why it appears |
+|---|---:|---|
+| `-` | 82,638 | ordinary in point names (§3.4) |
+| vertical bar | 41,960 | the node/port separator of §3.3 — structural, not optional |
+| `*` | 35,810 | the wildcard selector of §10.2.3 |
+| lowercase | 63,985 | node and object names are not upper-cased on the wire |
+
+The remaining 84.3% *could* be encoded either way, so the corpus cannot show a
+RAD-50 node — it can only show that none of these nodes is one. **The practical
+consequence is narrow and worth stating**: `|` is the address separator and `*`
+is the wildcard, so **any node speaking RAD-50 could not express an address or a
+wildcard in a string field at all**. Whatever RAD-50 is for on those platforms,
+it is not for the fields this corpus carries. A decoder should read `TEXT_` as
+ASCII and treat RAD-50 as a storage encoding it may meet in a panel database
+(§16.2), not on the wire. **[OPEN]** for what a RAD-50 platform actually puts in
+these fields — no such node appears here. [W][D]
 
 #### 8.4.1 The RAD-50 codec [S]
 
@@ -7642,6 +7674,12 @@ decodable.**
 
 #### 11.5.4 Logical type → BACnet object type (optional cross-reference)
 
+> **No BACnet object-type field is decoded anywhere in the corpus** — not
+> `object_Type`, `object_Identifier`, nor any spelling of them. The mapping below
+> is the vendor's, and this corpus neither confirms nor contradicts a single row
+> of it. It is offered as a cross-reference for someone bridging the two models,
+> which is what the heading says, and not as observed behaviour. [D][W]
+
 Where a P2 point is exposed on a BACnet/IP interface, its logical type maps to a BACnet object type; the physical/virtual flag selects the I/O-object versus value-object form. [D] (BACnet exposure is a separate stack; this map is provided only for implementers bridging the two.)
 
 | P2 L-type | Physical | Virtual | Tag |
@@ -8887,6 +8925,13 @@ end of every successful enumeration.** [W]
 ## 16. Database, Bulk Transfer, On-Disk (.P2) Format, Application Catalog & Firmware
 
 ### 16.1 Bulk database transfer
+
+> **No bulk-database-transfer opcode carries a body in this corpus.** The
+> mechanism below is described from the type system and vendor material; nothing
+> here shows a panel performing one. The on-disk form of the same data *is*
+> wire-independent evidence and is decoded in §16.2 from 36 panel databases —
+> read that section for what the records look like, and this one for how the
+> transfer is meant to work. **[OPEN]** [S][W]
 
 A panel database is moved across P2 **record-by-record**, not as a single monolithic blob. Each record is its own request that returns either a success (dir `0x01`) or a 2-byte fault/error code (dir `0x05`), corroborating the directory-byte/error model of §7. The transfer is organized into sections gated by firmware revision — a section unsupported by a panel's firmware is skipped or rejected per-record rather than aborting the whole transfer. [D/W]
 
