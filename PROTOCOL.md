@@ -2547,6 +2547,18 @@ families are shaped as they are: [S]
 | `NetMgrRequest` | network-management request, distinct from ordinary data |
 | `SourceData` | the originating-side data path |
 
+**Three of these have an unmistakable wire counterpart; the rest have none.**
+`Request`/`Response` is the confirmed exchange of §7.1, seen throughout.
+`ReadEventInd` is the unconfirmed COV/alarm push, which the direction byte marks
+directly (§6.3). `GetFirst`/`GetNext` is the range-and-resume cursor of §10.2.3
+— **62,076** resume-key fields are decoded in the corpus. The remaining four —
+`ReturnData`, `ReadConfirmedInd`, `NetMgrRequest`, `SourceData` — are names for
+paths *inside* the stack and carry **no distinguishing field on the wire**: a
+decoder cannot tell them from an ordinary exchange and should not try to. Read
+this table as an explanation of why the opcode families are shaped as they are,
+which is what it is for, and not as a set of message types to dispatch on.
+[W][S]
+
 The **`GetFirst` / `GetNext` / `CancelGetNext` triple is the same cursor idiom**
 §7.2's continuation discussion describes at the application layer: enumeration
 is a stack-level concept, not a per-opcode convention, which is why the
@@ -7694,6 +7706,35 @@ The BACnet object and the P2 point are **fields of the same body**. That is the
 join: not a mapping table the supervisor maintains, but a single record that
 declares a point twice.
 
+**And the structure set proves it rather than asserting it.** There is a second,
+plain family this section did not mention — `AP2_POINT_ADD_<LTYPE>` at
+`0x0200`–`0x020F` — and the BACnet form is a **strict superset of it**.
+`AP2_Point_Add_LAO_Request` declares five fields;
+`AP2_BAC_Point_Add_LAO_Request` declares the same five plus exactly four more:
+`bac_data_revision`, `bac_data_size`, `bac_props_common`, `bac_point_base`.
+Nothing is renamed, reordered or dropped. **The BACnet point-add is the P2
+point-add with a BACnet block bolted on**, which is a stronger statement of the
+join than the field list alone. [S]
+
+**Which of the two you can actually use is the opposite of what this section
+implies.** [W][S]
+
+| | opcodes | in the shipped catalog | observed |
+|---|---|---|---|
+| plain `AP2_POINT_ADD_<LTYPE>` | `0x0200`–`0x020F`, sixteen | **all sixteen** | **yes** — `0x0203 LAO` ×2, `0x0204 LAI` ×8 |
+| `AP2_BAC_Point_Add_<LTYPE>` | **none known** | **none** | **no** |
+
+The thirteen `AP2_BAC_Point_Add_*` structures are in the vendor's type system and
+in no opcode mapping, so `p2_asdu.py` prunes them (it carries only structures an
+operation can reach, §10.9) and the shipped decoder cannot walk one. Nor has any
+been seen: the corpus contains no BACnet point-add traffic at all.
+
+So treat this section as **the type system's account of how the two identities
+are joined**, which it establishes well, and not as an operation you can invoke.
+If you need to create a point over P2 today, the plain family is the one that is
+mapped, shipped and observed. Finding the opcode that carries the BACnet form is
+**[OPEN]**.
+
 **Twelve of the sixteen P2 point types have a typed form.** [S]
 
 | | |
@@ -9229,6 +9270,13 @@ point-team model**: an application number resolving to an ordered member list,
 each member typed and scaled exactly as §11 describes. Roughly seventeen device
 families are carried this way. [S]
 
+**The wire shows one of them.** `application_number` is decoded **291** times
+across the corpus and takes exactly **three** distinct values: `0`, and the two
+spellings of the unset sentinel (`-1` / `65535`, §9.5.1). So the uniform model is
+a claim about the vendor's library — a good source for it, and the right one —
+but this site runs a single application, and nothing here tests the claim for the
+other sixteen families. [W]
+
 What matters to an implementer is that they are not each modelled differently.
 **Sixteen of the seventeen families carry a common diagnostics team**, so a
 client that understands it can report on a gateway-attached device of any
@@ -9257,6 +9305,13 @@ point-command path rather than through any special operation. [S]
 ### 16.4 Reading a controller application from a live panel
 
 The upload opcodes for the application/team model: `0x0986 AP2_UPL_ALL_TEC` (upload all TEC application data), `0x400F AP2_TEAM_DESC_UPLOAD` (upload a point-team descriptor), `0x4015/0x4016 AP2_TEAM_DESC_DB_CHANGE / TEAM_MEMBER_DB_CHANGE` (team DB-change replication). Walking `0x0986` for a panel returns its loaded controller applications, which a client resolves against the master `.ptd`/DBF library by application number + revision. [S]
+
+**Two of those four opcodes are exercised here and two are not.** `0x0986`
+carries **2,019** bodies in the corpus and `0x400F` carries **38**, so the upload
+path is wire-confirmed. `0x4015` and `0x4016` carry **none** — the team
+DB-change replication path is described from the type system alone, and a client
+that relies on being notified of a team change has no evidence here that the
+notification arrives. **[OPEN]** [W]
 
 ### 16.4.1 `AP2_SERVICES_RENDERED` — the capability document
 
