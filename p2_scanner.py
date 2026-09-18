@@ -112,7 +112,7 @@ import p2_data            # compiled-in opcode / point-type / enum tables
 # Single source of truth for the scanner library version. Keep in sync
 # with pyproject.toml's [project].version. `import p2_scanner` users can
 # inspect `p2_scanner.__version__` rather than parsing pyproject metadata.
-__version__ = "1.3.1"
+__version__ = "1.4.0"
 
 # Console output uses Unicode formatting chars (✓ ✗ ⚠ ── → ═) for readability.
 # Windows defaults to cp1252 in cmd.exe / PowerShell, which crashes on these.

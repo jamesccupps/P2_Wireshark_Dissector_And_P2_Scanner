@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — correctness pass
+## v2.9.0 — the correctness pass (2026-09-18)
 
 Nine defects in shipped code, and a corpus recount that moved every aggregate
 figure in `PROTOCOL.md`. If you are running 2.8.2, the first four are producing
@@ -112,7 +112,7 @@ the analyzer; and a codec built from `PROTOCOL.md` alone whose selftest
 round-trips real capture frames — **144,156 frames over three captures, every
 one re-encoded byte-identically.**
 
-## Unreleased — the `msg_type` correction (earlier in the same cycle)
+## v2.9.0 — the `msg_type` correction (earlier in the same cycle)
 
 **The "message class" model is withdrawn.** Earlier entries in this file, and
 releases up to 2.8.2, described the `u32` at frame offset 4 as a message class

@@ -13,8 +13,17 @@ equipment. This repository contains three things:
 The dissector is built and validated from wire captures; the opcode names are the
 protocol's AP2 function-code vocabulary.
 
-> **Unreleased — a correction.** The `u32` at frame offset 4 is a **header
-> length**, not a message class. It is `13 + the total bytes of the four routing
+> **v2.9.0 — the correctness pass.** Nine defects in shipped code, and a
+> corpus recount. **If you are running 2.8.2, four of them are producing wrong
+> output on your captures right now**: the dissector's Info column warned on
+> every correct request frame and stayed silent on the one header-length error
+> it exists to catch; a `0x00`-typed string TLV made a COV point report
+> `9.24856986e-44` instead of `72.25`, or decode no points at all;
+> `analyze_pcap.py` counted every retransmitted frame twice, inflating every
+> number it printed; and it reported 558 catalogued opcodes as unknown. Full
+> account in the [changelog](CHANGELOG.md).
+>
+> **Also in 2.9.0: the `u32` at frame offset 4 is a header length, not a message class.** It is `13 + the total bytes of the four routing
 > slots`, so it is a sum of node-name lengths and differs from site to site —
 > **compute it; never choose it**. Releases up to v2.8.2 described it as a class
 > taking six values in legacy/modern pairs chosen by a panel's firmware
