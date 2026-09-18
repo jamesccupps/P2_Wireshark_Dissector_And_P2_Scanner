@@ -8496,11 +8496,25 @@ generating or parsing PPCL source (§14). [W][D]
 | Emergency | `EMON` `EMOFF` `EMSET` `EMFAST` `EMSLOW` `EMAUTO` |
 | Energy / time | `DAY` `NIGHT` `DAYMOD` `NGTMOD` `TOD` `TODMOD` `TODSET` `HOLIDA` `DC` `SSTO` `SSTOCO` `PDL` `PDLDAT` `PDLDPG` `PDLMTR` `PDLSET` `TIMAVG` `INITTO` `TOTAL` `PRFON` |
 | Comms | `EPHONE` `DPHONE` `OIP` |
-| Comparison, word form | `EQ` `NE` `LT` `LE` `GT` `GE` `EQUAL` `LESS` |
+| Comparison, word form | `EQ` `NE` `LT` `LE` `GT` `GE` |
 | Logical, word form | `AND` `OR` `NAND` `XOR` |
 | Operators, dotted form | `.EQ.` `.NE.` `.LT.` `.LE.` `.GT.` `.GE.` `.AND.` `.OR.` `.NAND.` `.XOR.` `.ROOT.` |
 | Math | `SIN` `COS` `TAN` `ATN` `LOG` `EXP` `SQRT` `ROOT` `COM` |
 | Command priority | `@NONE` `@OPER` `@PDL` `@EMER` `@SMOKE`, and the bare `NONE` `OPER` `PDL` `EMER` `SMOKE` |
+
+> **Correction: `EQUAL` and `LESS` are not keywords, and an earlier edition of
+> this table listed them.** They are the *English descriptions* of `EQ` and
+> `LT`. The vendor's precedence table has two columns — a description column
+> reading "Equal to / Not equal to / Greater than / Greater than or equal to /
+> Less than / Less than or equal to" and an operator column reading
+> `EQ NE GT GE LT LE` — and the first column was read as tokens. Neither word
+> occurs as a bare uppercase token anywhere in the vendor PPCL glossary. A
+> tokenizer that accepts them accepts something no panel compiles. [D]
+>
+> The same table is the source of a second, independent documentation error
+> worth knowing about: it gives **`ARC(value1)`** for arc-tangent, where the
+> function is **`ATN`**. Anything generated from that row alone will be
+> rejected. [D]
 
 Two things an implementer should take from this. **Every comparison and logical
 operator has two spellings** — a bare word and a dot-delimited form — and both
