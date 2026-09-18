@@ -3212,12 +3212,17 @@ local function dissect_cov(tvb, off, last, tree)
   while off + 9 <= last do
     local rec = off
     off = off + 2                              -- name_space (u16; observed 00 00 = system)
-    if tvb(off,1):uint()~=0x01 then break end
+    -- textType is 0x00 or 0x01 (8.1). Testing ~=0x01 here used to `break`,
+    -- abandoning every remaining record over one 0x00-typed name.
+    if tvb(off,1):uint() > 0x01 then break end
     local l = tvb(off+1,2):uint(); if off+3+l > last then break end   -- u16 length (8.1)
     local pt = tree:add(p2, tvb(rec,0), "COV point")
     pt:add(f.cov_point, tvb(off+3,l)); off = off + 3 + l
-    -- suffix TLV: empty (01 00 00) for top-level points; non-empty for FLN subpoints
-    if off+3 <= last and tvb(off,1):uint()==0x01 then
+    -- suffix TLV: empty for top-level points, non-empty for FLN subpoints.
+    -- The empty form is `01 00 00` OR `00 00 00` -- textType 0x00 is legal and
+    -- occurs. Testing ==0x01 skipped the advance and then read the suffix
+    -- header as the f32 value, reporting a denormal instead of the reading.
+    if off+3 <= last and tvb(off,1):uint() <= 0x01 then
       local sl = tvb(off+1,2):uint()
       if off+3+sl <= last then
         if sl > 0 then pt:add(f.cov_point, tvb(off+3,sl)) end
@@ -3239,9 +3244,14 @@ local function dissect_cov(tvb, off, last, tree)
 end
 local function dissect_roster(tvb, off, last, tree)
   if off+8 > last then return end
+  local n = tvb(off+6,2):uint()
   tree:add(f.r_tabver, tvb(off+4,2)); tree:add(f.r_count, tvb(off+6,2)); off = off + 8
-  while off + 3 <= last do
-    if tvb(off,1):uint()~=0x01 then break end
+  -- Walk the DECLARED count, not "until the bytes run out". The table ends with
+  -- four zero bytes after the last entry, and an end-of-buffer walk reads those
+  -- as a blank 15th node. It used to stop there for the wrong reason -- a
+  -- textType test that `break`s on 0x00, which is a legal textType (8.1).
+  for _ = 1, n do
+    if off + 3 > last or tvb(off,1):uint() > 0x01 then break end
     local l = tvb(off+1,2):uint(); if off+3+l > last then break end   -- u16 length (8.1)
     local e = tree:add(p2, tvb(off,0), "Node entry")
     e:add(f.r_name, tvb(off+3,l)); off = off + 3 + l
@@ -3251,7 +3261,9 @@ end
 local function dissect_identity(tvb, off, last, tree)
   local fl = { f.id_node, f.id_site, f.id_bln }; local idx = 1
   while off + 3 <= last and idx <= 3 do
-    if tvb(off,1):uint()~=0x01 then break end
+    -- textType is 0x00 or 0x01 (8.1). Testing ~=0x01 here used to `break`,
+    -- abandoning every remaining record over one 0x00-typed name.
+    if tvb(off,1):uint() > 0x01 then break end
     local l = tvb(off+1,2):uint(); if off+3+l > last then break end   -- u16 length (8.1)
     tree:add(fl[idx], tvb(off+3,l)); off = off + 3 + l; idx = idx + 1
   end
@@ -3349,6 +3361,11 @@ local function dissect_alarm(tvb, off, last, tree)
   local nts = 0                                  -- alarm records carry up to 3 timestamps
   while off < last do
     local b0 = tvb(off,1):uint()
+    -- Deliberately strict: this is an unanchored scan, and accepting
+    -- textType 0x00 here makes every 0x00 byte a TLV candidate. Measured over
+    -- the corpus that desynchronises the walk and replaces point names with
+    -- empty strings (976 rows). The anchored decoders read the full rule; see
+    -- `_probe_tlv` in p2_scanner.py for the same trade-off written down.
     if off + 3 <= last and b0 == 0x01 and tvb(off+1,1):uint() == 0x00 then
       local l = tvb(off+2,1):uint()
       if off + 3 + l <= last then
@@ -3406,6 +3423,11 @@ local EU_HINT = { ["DEG F"]=1,["DEG C"]=1,["PCT"]=1,["IN H2O"]=1,["PSI"]=1,["GPM
 local function dissect_value_resp(tvb, off, last, tree)
   while off < last do
     local b0 = tvb(off,1):uint()
+    -- Deliberately strict: this is an unanchored scan, and accepting
+    -- textType 0x00 here makes every 0x00 byte a TLV candidate. Measured over
+    -- the corpus that desynchronises the walk and replaces point names with
+    -- empty strings (976 rows). The anchored decoders read the full rule; see
+    -- `_probe_tlv` in p2_scanner.py for the same trade-off written down.
     if off + 3 <= last and b0 == 0x01 and tvb(off+1,1):uint() == 0x00 then
       local l = tvb(off+2,1):uint()
       if off + 3 + l <= last then

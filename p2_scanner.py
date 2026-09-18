@@ -1550,7 +1550,11 @@ class P2Connection:
         # at the very end of the payload with no trailing data — symptom is digital
         # points without a units TLV silently failing to parse.
         for i in range(1, len(payload) - 13):
-            if not (payload[i]   == 0x01 and payload[i+1] == 0x00
+            # The empty units TLV is `01 00 00` or `00 00 00` -- textType
+            # 0x00 is legal (PROTOCOL.md 8.1) and 12 of the corpus's
+            # eng_units fields use it. Both length bytes are still required
+            # to be zero, so this cannot match anything a scan would desync on.
+            if not (payload[i] <= 0x01 and payload[i+1] == 0x00
                     and payload[i+2] == 0x00):
                 continue
             # Sentinel shapes: see PROTOCOL.md §12.3.
@@ -6602,9 +6606,16 @@ def _read_tlv(body: bytes, off: int):
     or more -- the free-text band that carries message text, licence strings,
     point descriptions and PPCL program lines.
 
+    textType is 0x00 or 0x01. The "always 0x01" reading came from a census that
+    scanned FOR 0x01 bytes and so could not have found a counter-example; reading
+    textType by structural position instead finds 24 of 113,523 typed 0x00 --
+    every one an empty string, across eng_units, name, suffix and descriptor.
+    Refusing those returned (None, off), so the caller did not advance and read
+    the next field from inside the TLV header.
+
     Use this where the offset is known to hold a TLV. For an unanchored scan use
     `_probe_tlv`, which is deliberately stricter."""
-    if off + 3 > len(body) or body[off] != 0x01:
+    if off + 3 > len(body) or body[off] > 0x01:
         return None, off
     ln = (body[off + 1] << 8) | body[off + 2]
     if off + 3 + ln > len(body):
