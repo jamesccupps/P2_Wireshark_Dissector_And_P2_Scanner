@@ -1034,8 +1034,9 @@ behavior an operator reported to this project. [D][OPEN]
 
 > **Evidence basis for this whole section, stated plainly.** Every claim in §4.2
 > is **[D]** — vendor documentation, not observation. **This corpus contains no
-> AEM traffic whatsoever**: of 623,164 trusted frames, 431,463 are on native
-> TCP/5033 and **zero** are on TCP/3001. Nothing here has been checked against a
+> AEM traffic whatsoever**: of 623,164 trusted frames, **434,264 have an
+> endpoint on TCP/5033 and 188,900 on TCP/5034 — summing to the whole corpus —
+> and zero are on TCP/3001.** Nothing here has been checked against a
 > capture, the serial-BLN framing inside such a stream remains **[OPEN]** (§4.3,
 > §4.5), and a capture from an AEM Channel 1 would be one of the more valuable
 > contributions this document could receive. [W][D][OPEN]
@@ -1087,7 +1088,7 @@ A panel may alternatively host a BACnet MS/TP fieldbus in place of P1 (`Fln_type
 
 > **Nothing in this section is wire-verified, and it is the section a reader
 > with serial panels will reach for first.** This corpus is entirely native
-> P2/IP: **431,463 frames on TCP/5033 and zero on TCP/3001** (§4.2), so no
+> P2/IP: **434,264 frames with an endpoint on TCP/5033 and zero on TCP/3001** (§4.2), so no
 > serial trunk and no AEM tunnel has ever been captured here. The token-passing
 > discipline and the parameter defaults below come from the driver's own
 > configuration surface, which is a good source for *what the parameters are*
