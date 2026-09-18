@@ -2907,6 +2907,11 @@ Most addressable requests open with a **scope tag**: a scope-name string TLV (§
                         scope_byte=0x23, then wildcard mask 3F FF FF FF
 ```
 
+> The example shows `0x23`, but that is the **less common** value. It is the
+> `point_priority` field of the table below, and a plain read carries **`0x00`**
+> — 17,650 requests against 1,061. §6.1's worked `0x0220` read shows the `0x00`
+> form. Copy the field, not the example's value.
+
 **This block is a `User_profile`, and reading it as one explains every field.**
 The structure catalog defines `User_profile` as `user_logon : TEXT_`,
 `point_priority : Point_priority`, `access_class : BITSTRING32` — a name, a
