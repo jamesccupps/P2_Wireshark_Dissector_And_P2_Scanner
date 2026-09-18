@@ -34,120 +34,32 @@ except (AttributeError, OSError):
     pass  # already UTF-8, or stdout was redirected to something that can't be reconfigured
 
 
-# Known opcodes — kept in sync with p2.lua (the canonical authoritative
-# source). If a new opcode is added there, mirror it here or this
-# analyzer will flag it as "*** UNKNOWN ***" and drown the real unknowns.
-# The lua dissector's `OPCODES` table is the source of truth.
-KNOWN_OPCODES = {
-    # Sysinfo / firmware
-    0x0100: "GetRevString",
-    0x010C: "SysInfoCompact",
-
-    # Status / discovery / panel-name leak
-    0x0050: "StatusQuery",
-    0x0606: "Ping",
-    0x5354: "StatusVariant — constant body 53 54 01 00 04 SYST 00 3F FF FF FF; always 0x0003",
-
-    # Property read / write
-    0x0220: "ReadShort(modern)",
-    0x0271: "ReadExtended(legacy)",
-    0x0272: "ReadExtended-MetaOnly",
-    0x0273: "WriteNoValue/PointExistenceProbe",  # dominant: Desigo UI browse probe
-    0x0274: "ValuePush/COV",
-    0x0240: "WriteWithQuality",                   # SYST/sep=0x23 vs NONE/sep=0x00 shapes keyed to scope tag + direction, not port
-    0x0241: "PropertyEcho/DefaultPropertyResolve(SYST)",  # paired-response wire fmt pinned May2026
-    0x0244: "ScopedQuery",
-    0x0245: "TestProbe",
-    0x0291: "SYST property op (probable write)",  # 01 00 c8 [type] [f32] value marker
-    0x0294: "SYST read variant (small + 222B preallocated)",
-    0x0295: "SYST read variant (sibling of 0x0294)",
-    0x02A8: "SYST property op (probable write w/ priority trailer 50 00)",
-
-    # Object lifecycle
-    0x0203: "ObjectLifecycle 0203 (probe variant)",
-    0x0204: "CreateObject (returns 0x0E11 if exists)",
-    0x0260: "ObjectLifecycle 0260 (probe variant; carries f32=1.0 default-value)",
-    0x0263: "ObjectLifecycle 0263 (probable delete; ACK-only response)",
-
-    # Bare-opcode session pings (PXC->DCC, body length=2; opportunistic, not panel-specific)
-    0x0951: "BarePing 0951 (2B opportunistic ping; many-to-many panel mapping)",
-    0x0954: "BarePing 0954 (2B opportunistic ping)",
-    0x0955: "BarePing 0955 (2B opportunistic ping)",
-    0x0956: "BarePing 0956 (2B opportunistic ping)",
-    0x0959: "BarePing 0959 (2B opportunistic ping)",
-
-    # Routing / topology
-    0x0368: "NodeRoutingQuery",
-
-    # State-set / metadata
-    0x040A: "MultiStateLabelCatalog",
-
-    # Alarms
-    0x0508: "AlarmReport",
-    0x0509: "AlarmAck",
-
-    # Enumeration / panel walk
-    0x0981: "EnumeratePoints",
-    0x0982: "EnumerateTrended",
-    0x0983: "EnumerateVariant",
-    0x0984: "EnumerateVariant",
-    0x0985: "EnumeratePrograms",
-    0x0986: "EnumerateFLN",
-    0x0987: "EnumerateVariant",
-    0x0988: "EnumerateMulti",
-    0x0989: "EnumerateVariant",
-    0x099F: "GetPortConfig (5B body 09 9F 00 04 XX; 6 indices 0xFF/0x00-0x04 walked per audit)",
-
-    # Legacy point/title queries
-    0x0961: "AnalogPointQuery(legacy)",
-    0x0964: "TitleAnalogQuery",
-    0x0965: "NodeDiscoveryEnumerate",
-    0x0966: "ShortQuery",
-    0x0969: "ScheduleObjectList",
-    0x0971: "EnhancedPointRead",
-    0x0974: "MultistatePointEnumerate",
-    0x0975: "NodeDiscoveryWithLines",
-    0x0976: "DeviceAllSubpointsRead",
-    0x0979: "ShortVariant",
-    0x098B: "Enumerate(newer) — constant body 09 8B 00 01 00 FA 00 00; always 0x0003",
-    0x098C: "ScheduleSetpointTable",
-    0x098D: "ScheduleEntries",
-    0x098E: "ScheduleGainConfig",
-    0x098F: "ScheduleDeadband",
-
-    # Newer-firmware capability probes (mostly errors on legacy)
-    0x09A3: "EnumerateNewer",
-    0x09A7: "EnumerateNewer",
-    0x09AB: "EnumerateNewer",
-    0x09BB: "EnumerateNewer",
-    0x09C3: "EnumerateNewer",
-    0x400F: "CapabilityProbe",
-    0x4010: "CapabilityProbe",
-    0x4011: "CapabilityProbe",
-    0x4133: "CapabilityProbe",
-    0x4500: "TestProbe",
-
-    # PPCL editor
-    0x4100: "PPCL LineWrite/Create",
-    0x4103: "PPCL ProgramEnableHint",
-    0x4104: "PPCL LineRead/Delete",
-    0x4106: "PPCL ClearTracebits",
-
-    # Bulk property
-    0x4200: "PropertyQuery",
-    0x4220: "BulkProperty variant (222B preallocated; '00 10' selector at sentinel — single sample)",
-    0x4221: "BulkPropertyRead (273B preallocated)",
-    0x4222: "BulkPropertyWrite (canonical SYST setpoint write opcode)",
-
-    # Schedule writes
-    0x5003: "ScheduleObjectInfoQuery",
-    0x5020: "ScheduleEntryWrite",
-    0x5022: "ScheduleSlotInit",
-    0x5038: "ObjectDisplayLabels",
-
-    # Routing / identity
-    0x4634: "RoutingTable",
-    0x4640: "Identify",
+# Short labels for the census columns. These are a DISPLAY GLOSS, not the
+# opcode catalog: "ValuePush/COV" reads better than "AP2_COV_ANNUNCIATE" when
+# you are scanning a column of counts, and that is all they are for.
+#
+# What is KNOWN is decided by `p2_data.OPCODE_NAMES` (638 entries, generated;
+# the same table behind PROTOCOL.md §9.5 and p2.lua's P2_DATA block) via
+# `opcode_label()` below. This list used to be the catalog, hand-maintained at
+# 80 entries with a comment asking a person to mirror new opcodes into it by
+# hand — so 558 opcodes this repository already names were reported as
+# "*** UNKNOWN *** <-- NEW", which is precisely the drowning the comment warned
+# about. Adding a gloss here is optional and affects only how a line reads.
+WIRE_NOTES = {
+    # Not names -- OBSERVATIONS, kept because the AP2 function-code name cannot
+    # carry them and they were established from the wire. Everything else that
+    # used to live here was a pre-enumeration guess at what an opcode does; 73
+    # of those 80 labels contradicted the catalog outright (e.g. 0x0271
+    # "ReadExtended(legacy)" against AP2_COV_ENABLE), so they are gone and
+    # `p2_data` is the single name source, as it is for PROTOCOL.md §9.5 and
+    # p2.lua. Full account in the findings, §115.
+    0x5354: "constant body 53 54 01 00 04 SYST 00 3F FF FF FF; always 0x0003",
+    0x098B: "constant body 09 8B 00 01 00 FA 00 00; always 0x0003",
+    0x0204: "returns 0x0E11 if the object already exists",
+    0x0294: "small request, 222 B preallocated response",
+    0x4220: "222 B preallocated; '00 10' selector at the sentinel (single sample)",
+    0x4221: "273 B preallocated",
+    0x099F: "5 B body 09 9F 00 04 XX; indices 0xFF and 0x00-0x04 walked",
 }
 
 # Full 37-code catalog per PROTOCOL.md §7.2.2; kept in sync with
@@ -214,8 +126,25 @@ DUMP_LIMIT = 0
 
 try:
     import p2_body
-except ImportError:                        # the catalog is optional
+except ImportError:                        # the structure catalog is optional
     p2_body = None
+
+try:
+    import p2_data                         # the generated opcode catalog
+except ImportError:
+    # It is the ONLY opcode name source now, so without it every opcode
+    # reads as unknown. It ships in this directory; if it is missing, put it
+    # back rather than reading the "NEW" column.
+    p2_data = None
+
+def opcode_label(op):
+    """Display label, or None if the opcode is genuinely not in the catalog."""
+    name = p2_data.opcode_name(op) if p2_data is not None else None
+    if not name:
+        return None
+    note = WIRE_NOTES.get(op)
+    return "%s [%s]" % (name, note) if note else name
+
 
 # --decode collectors
 decode_stats = Counter()
@@ -313,7 +242,7 @@ def process_p2_frame(frame, src_ip, src_port, dst_ip, dst_port):
         opcode_by_port[dst_port][opcode] += 1
         if DECODE:
             decode_body(opcode, body[2:])
-        if opcode not in KNOWN_OPCODES and len(unknown_opcode_samples[opcode]) < 3:
+        if opcode_label(opcode) is None and len(unknown_opcode_samples[opcode]) < 3:
             unknown_opcode_samples[opcode].append({
                 "frame_len": total_len,
                 "src": f"{src_ip}:{src_port}",
@@ -433,14 +362,15 @@ def main():
     print(" REQUEST OPCODES (dir=0x00)")
     print("=" * 70)
     for op, cnt in opcode_counts.most_common():
-        name = KNOWN_OPCODES.get(op, "*** UNKNOWN ***")
-        marker = "" if op in KNOWN_OPCODES else "  <-- NEW"
+        label = opcode_label(op)
+        name = label or "*** UNKNOWN ***"
+        marker = "" if label else "  <-- NEW"
         sizes = opcode_sizes[op]
         if sizes:
             sz = f"sizes {min(sizes)}–{max(sizes)} avg {sum(sizes)//len(sizes)}"
         else:
             sz = ""
-        print(f"  0x{op:04X}  {name:<25s}  {cnt:>6d}  {sz}{marker}")
+        print(f"  0x{op:04X}  {name:<46s}  {cnt:>6d}  {sz}{marker}")
 
     print("\n" + "=" * 70)
     print(" REQUEST OPCODES — BY DESTINATION PORT")
@@ -448,8 +378,8 @@ def main():
     for port, opcodes in sorted(opcode_by_port.items()):
         print(f"\n  → port {port}:")
         for op, cnt in opcodes.most_common():
-            name = KNOWN_OPCODES.get(op, "UNKNOWN")
-            print(f"    0x{op:04X}  {name:<25s}  {cnt:>6d}")
+            name = opcode_label(op) or "UNKNOWN"
+            print(f"    0x{op:04X}  {name:<46s}  {cnt:>6d}")
 
     print("\n" + "=" * 70)
     print(" ERROR CODES (dir=0x05)")

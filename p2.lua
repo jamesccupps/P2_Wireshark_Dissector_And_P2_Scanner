@@ -3576,11 +3576,16 @@ local function dissect_one(tvb, pinfo, tree)
   -- slots is answered 98.0% of the time and one that does not 6.2%
   -- (PROTOCOL.md 6.2.2). An intermittent silent drop is the hardest failure to
   -- diagnose from the sending side, which is why this is worth surfacing.
-  st:add(f.hdr_calc, tvb(4,4), off):set_generated()
-  if hdrlen ~= off then
+-- Name it, because `off` keeps walking: the opcode read below does
+  -- `off = off + 2`, and the Info column compares against this same value ~70
+  -- lines further on. Comparing `hdrlen` to a bare `off` down there reported a
+  -- 2-byte mismatch on every single request frame.
+  local hdr_end = off
+  st:add(f.hdr_calc, tvb(4,4), hdr_end):set_generated()
+  if hdrlen ~= hdr_end then
     st:add(f.hdr_bad, tvb(4,4),
            string.format("wire says %d, slots give %d (13 + %d) -- a panel usually drops this",
-                         hdrlen, off, off - 13)):set_generated()
+                         hdrlen, hdr_end, hdr_end - 13)):set_generated()
   end
   -- seq-state key: per TCP stream + the (echoed) sequence number
   local seq = tvb(8,4):uint()
@@ -3650,7 +3655,8 @@ local function dissect_one(tvb, pinfo, tree)
       st:add(f.resp_op, tvb(0,0), rlabel(rop)):set_generated()   -- 0-byte ACK (e.g. write)
     end
   end
-  local cls = (hdrlen == off) and "" or string.format("[hdrlen %d/=%d] ", hdrlen, off)
+  local cls = (hdrlen == hdr_end) and ""
+              or string.format("[hdrlen %d/=%d] ", hdrlen, hdr_end)
   local who = (slots[4] or "?").."->"..(slots[2] or "?")
   if dir == 0x00 then pinfo.cols.info:set(cls..(opname or "?").."  "..who)
   elseif dir == 0x05 then
