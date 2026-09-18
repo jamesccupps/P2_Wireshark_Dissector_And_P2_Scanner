@@ -1887,6 +1887,31 @@ function p2data.state_text(value, point_type, enum_id)
 end
 -- ==== P2_DATA END =========================================================
 
+-- ---------------------------------------------------------------------------
+-- A COUNTING CAVEAT THAT IS NOT THIS DISSECTOR'S TO FIX
+--
+-- A P2 frame carried in a PARTIAL RETRANSMISSION -- a segment that resends
+-- already-seen bytes AND appends new ones -- may never reach this dissector.
+-- Wireshark's TCP layer classifies the whole segment as a retransmission and
+-- skips it, new tail included. On the reference capture that hides 10 frames
+-- of 17,926: nine 0x0295 and one 0x0274, all in one 519-byte segment resent at
+-- a sequence number 104 bytes of which had already been delivered.
+--
+-- The obvious workaround is worse. With
+--     -o tcp.analyze_sequence_numbers:FALSE
+-- the same capture yields 18,056 -- 130 MORE than exist, because the duplicate
+-- bytes are then appended and parsed a second time.
+--
+--     Wireshark defaults            17,916   skips the segment, loses the tail
+--     seq analysis off              18,056   appends it, double-counts
+--     placed at sequence offset     17,926   correct
+--
+-- Only the third is right, and it is not something a dissector can do: by the
+-- time P2 sees the bytes, TCP has already decided. If you need an exact frame
+-- census rather than a decode, count with a reader that places each segment at
+-- its offset from the connection's lowest sequence number.
+-- ---------------------------------------------------------------------------
+
 -- Dissector version. Tracks the p2.lua decode surface only; the scanner
 -- versions independently (p2_scanner.__version__). History is in the Changelog
 -- comment block at the top of this file. Keep it in step with that block: a
