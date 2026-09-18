@@ -8497,24 +8497,55 @@ generating or parsing PPCL source (§14). [W][D]
 | Energy / time | `DAY` `NIGHT` `DAYMOD` `NGTMOD` `TOD` `TODMOD` `TODSET` `HOLIDA` `DC` `SSTO` `SSTOCO` `PDL` `PDLDAT` `PDLDPG` `PDLMTR` `PDLSET` `TIMAVG` `INITTO` `TOTAL` `PRFON` |
 | Comms | `EPHONE` `DPHONE` `OIP` |
 | Comparison, word form | `EQ` `NE` `LT` `LE` `GT` `GE` |
+| Reserved names with no documented syntax | `EQUAL` `LESS` |
 | Logical, word form | `AND` `OR` `NAND` `XOR` |
 | Operators, dotted form | `.EQ.` `.NE.` `.LT.` `.LE.` `.GT.` `.GE.` `.AND.` `.OR.` `.NAND.` `.XOR.` `.ROOT.` |
 | Math | `SIN` `COS` `TAN` `ATN` `LOG` `EXP` `SQRT` `ROOT` `COM` |
 | Command priority | `@NONE` `@OPER` `@PDL` `@EMER` `@SMOKE`, and the bare `NONE` `OPER` `PDL` `EMER` `SMOKE` |
 
-> **Correction: `EQUAL` and `LESS` are not keywords, and an earlier edition of
-> this table listed them.** They are the *English descriptions* of `EQ` and
-> `LT`. The vendor's precedence table has two columns — a description column
-> reading "Equal to / Not equal to / Greater than / Greater than or equal to /
-> Less than / Less than or equal to" and an operator column reading
-> `EQ NE GT GE LT LE` — and the first column was read as tokens. Neither word
-> occurs as a bare uppercase token anywhere in the vendor PPCL glossary. A
-> tokenizer that accepts them accepts something no panel compiles. [D]
+> **`EQUAL` and `LESS` are reserved, but they are not operators — and this
+> table has had them wrong in both directions.** An early edition listed them
+> among the comparison operators, which no vendor source supports. A later one
+> removed them as imaginary, which was also wrong. What they are is **names a
+> point may not take**.
 >
-> The same table is the source of a second, independent documentation error
-> worth knowing about: it gives **`ARC(value1)`** for arc-tangent, where the
-> function is **`ATN`**. Anything generated from that row alone will be
-> rejected. [D]
+> The source that settles it is the Program Editor's **enumerated reserved-word
+> page**, and what makes it decisive is its *shape*: 113 atomic entries laid out
+> in two columns, and **not one cell containing prose**. There is no description
+> column on it to misread. Both words hold their own alphabetical cell —
+> `… EPHONE EQ EQUAL EXP FAILED …` and `… INITTO LE LESS LINK LLIMIT …` — with
+> `EQ`, `LE` and `LT` enumerated separately alongside them. [D]
+>
+> **No syntax is documented for either.** No manual shows a statement using
+> `EQUAL` or `LESS`; outside the reserved-word lists they occur only in comment
+> prose in worked examples. A tokenizer that maps `EQUAL` onto `EQ` is inventing
+> an operator, and one that rejects a *program* for containing the word is
+> enforcing a rule that applies to point names. Reserve them; do not parse
+> them. [D]
+>
+> **The two failures are mirror images, and the second is the more instructive.**
+> Reading a description column as tokens manufactures words that do not exist —
+> the Desigo glossary titles its topics `Equal To - EQ` and `Less Than - LT`,
+> and that is exactly what happened here first. But the correction then applied
+> that explanation to a table that has no description column, and deleted two
+> real words. **Before concluding that a word is a description read as a token,
+> establish that the table it came from has a description column.** The test is
+> mechanical: a bare enumeration has no cell containing a space. [D]
+>
+> One error in the Desigo table does stand, and it is worth keeping because it
+> was found independently from two directions: it gives **`ARC(value1)`** for
+> arc-tangent where the function is **`ATN`**. `ARC` appears nowhere in the
+> enumerated reserved-word list; `ATN` is in it. Anything generated from that
+> row alone will be rejected. [D]
+>
+> **A live disagreement between two vendor enumerations, recorded rather than
+> resolved.** The Insight-era list reserves `NODE1` through `NODE99`; the
+> Desigo-era glossary gives `NODE0` through `NODE99`. Both are published and
+> neither retracts the other. This document keeps **`NODE0`–`NODE99`, one
+> hundred names**, because node 0 is a real drop address (§3.4) and because the
+> asymmetry favours it: over-reserving costs a spurious warning on a name nobody
+> chose, while under-reserving means never flagging a name the panel may refuse.
+> [D]
 
 Two things an implementer should take from this. **Every comparison and logical
 operator has two spellings** — a bare word and a dot-delimited form — and both
@@ -8522,21 +8553,65 @@ are reserved, so a tokenizer must accept `.GT.` and `GT` as the same operator.
 And **the dotted forms include `.ROOT.`**, an operator with no bare-word
 comparison analogue, which a grammar derived only from the word list will miss.
 
-#### Resident points and status words — referenced by programs, absent from the point database
+#### Resident points, status values and declarations — named by programs, absent from the point database
 
-A PPCL program also names values the **panel itself** maintains. They are not
-point-database entries, they are not returned by a point enumerate, and a client
-that resolves every name in a program against the point list will fail on them.
-**Twelve occur in this corpus's own recovered program source** — the counts are
-over the 2,644 lines of the note above: [W][D]
+A PPCL program also names things the **panel itself** provides. None of them are
+point-database entries, none are returned by a point enumerate, and a client that
+resolves every name in a program against the point list will fail on all of
+them. [W][D]
 
-| Kind | Words | Observed here |
+**They are four different kinds of thing, and a client that treats them alike
+reads statements wrong:**
+
+| Kind | Words | What a reader must do with it |
 |---|---|---|
-| Clock / calendar | `TIME` (military), `CRTIME` (decimal hours), `DAY`, `DAYOFM`, `MONTH` | `DAY` 109, `CRTIME` 22, `TIME` 8 |
-| Interval timers | `SECNDS`, `SECND1`–`SECND7` | `SECND1` 3, `SECND3` 2, `SECND4` 2, `SECND2` 1 |
-| Point status | `OK`, `FAILED`, `HAND`, `LOW`, `DEAD`, `STATE` | `LOW` 28, `FAILED` 6 |
-| Alarm state | `ALMACK`, `ALMCNT`, `ALMCT2`, `ALMPRI` | `ALMCNT` 8 |
-| Accumulator / scope | `TOTAL`, `LOCAL`, `$BATT`, `$PDL` | `TOTAL` 16, `LOCAL` 8 |
+| **Resident point** — a value the panel maintains | `TIME` (military), `CRTIME` (decimal hours), `DAY`, `DAYOFM`, `MONTH`, `SECNDS`, `SECND1`–`SECND7`, `NODE0`–`NODE99`, `$BATT`, `$PDL` | read as a value; do not resolve against the point list |
+| **Status value** — a constant compared against, not a point | `OK`, `FAILED`, `HAND`, `LOW`, `DEAD`, `STATE`, `ALMACK`, `ALMCNT`, `ALMCT2`, `ALMPRI` | it appears on the *right* of a comparison; never a target |
+| **Special function** — takes an argument | `TOTAL(point)` | a call, not a name |
+| **Declaration keyword** — never a value at all | `LOCAL` | introduces a statement; §14.3's statement table already lists it as one |
+
+`LOCAL` is the one that bites. It introduces a `LOCAL` declaration and is never
+something a program reads, so seeing it in source is evidence of a declaration,
+not of a resident value. This document listed it as both — as a program-control
+statement in the table above and as an accumulator here — sixty lines apart.
+
+##### What this corpus actually contains, counted by position
+
+The earlier edition of this section said "twelve occur in this corpus's own
+recovered program source" and gave a count for each. **Four of the twelve have
+zero value references**, and the reason is a counting method rather than a
+misreading: the figures came from a word-boundary match, and in a word-boundary
+match `.` is a boundary — so a word appearing as a **dotted segment of a point
+name** was counted as a reference to the resident value. That is precisely the
+trap §14.4 describes, applied to this document's own evidence. Recounted by
+syntactic position over the same 2,644 lines: [W]
+
+| Word | in a quoted name | a call | **a value** | in a comment |
+|---|---:|---:|---:|---:|
+| `CRTIME` | 0 | 0 | **22** | 0 |
+| `DAY` | 0 | 0 | **13** | 22 |
+| `TIME` | 0 | 0 | **7** | 1 |
+| `FAILED` | 0 | 0 | **6** | 0 |
+| `SECND1` | 0 | 0 | **3** | 0 |
+| `SECND3` | 0 | 0 | **2** | 0 |
+| `SECND4` | 0 | 0 | **2** | 0 |
+| `SECND2` | 0 | 0 | **1** | 0 |
+| `TOTAL` | 0 | 16 | 0 | 0 |
+| `LOCAL` | 0 | 4 | 0 | 4 |
+| `ALMCNT` | 0 | 0 | 0 | 8 |
+| `LOW` | 4 | 0 | 0 | 0 |
+
+So **eight resident values are referenced here, 56 times**; `TOTAL` and `LOCAL`
+appear only in the roles the table above gives them; and `ALMCNT` and `LOW`
+are not referenced as values at all — `ALMCNT`'s eight occurrences are comment
+prose and `LOW`'s four are inside quoted point names. **A published figure of
+`LOW` 28 was counting a name segment.** [W]
+
+**The general lesson for a client, which is why the recount is here rather than
+in a changelog:** deciding whether a word is a language reference or part of a
+name requires knowing *where in the statement it sits*. Quoted, called,
+compared-against and commented are four different answers, and a regex that
+matches the word alone cannot tell them apart. [W]
 
 **The implementer consequence is the whole reason this is here.** Reading a
 program back with `UPL_ALL_PPCL` (`0x0985`, §14.5.1) gives source that

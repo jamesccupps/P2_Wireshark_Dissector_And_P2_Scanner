@@ -1,5 +1,49 @@
 # Changelog
 
+## Unreleased
+
+### `PROTOCOL.md` §14.3 — `EQUAL` and `LESS` are reserved words after all
+
+v2.9.0 shipped a correction removing `EQUAL` and `LESS` from the PPCL
+reserved-word set, on the reasoning that they were the description column of a
+two-column vendor table read as tokens. **That correction was wrong**, and if
+you built a tokenizer or a linter from it, its reserved-word list is two
+entries short.
+
+Both words appear in two independent vendor *enumerations* — the Insight
+Program Editor's reserved-word page and 125-1896 Rev. 5 chapter 5 — each in its
+own alphabetical cell, on pages that have no description column at all. The
+Program Editor page is 224 cells and not one of them contains prose.
+
+What no edition of this table had right: they are reserved **names**, not
+operators. No vendor source documents a syntax for either, and in Siemens' own
+84-program PPCL application library both occur only inside comment lines. A
+tokenizer that maps `EQUAL` onto `EQ` invents an operator. §14.3 now carries
+them in a row of their own.
+
+`ARC` → `ATN`, the other half of the v2.9.0 correction, is unaffected and
+confirmed from two directions.
+
+### §14 — resident points were four different kinds of thing
+
+The resident-point table filed `LOCAL`, `TOTAL`, `LOW` and `FAILED` alongside
+`TIME` and `CRTIME`. `LOCAL` is a **declaration keyword** and is never a value a
+program reads; `TOTAL` is a **function**; `LOW` and `FAILED` are **status
+values** compared against. A client resolving all of them as resident points
+reads those statements wrong. The occurrence counts were also recounted by
+syntactic position rather than by regex — the old figures counted a word
+appearing as a dotted segment of a *point name* as a reference to the resident
+value.
+
+### `p2_scanner.py` — a withdrawn model surviving in a docstring
+
+`_parse_handshake_response` still drew the frame as
+`[4B length BE] [4B msg_type=0x33/0x34] ...`, which reads as a fixed pair of
+class bytes. `msg_type` is a header length, `13 + the total bytes of the four
+routing slots`; `0x33` and `0x34` are simply the two lengths that capture's node
+names produced. No behaviour change — the code has computed the field since
+1.4.0.
+
 ## v2.9.0 — the correctness pass (2026-09-18)
 
 Nine defects in shipped code, and a corpus recount that moved every aggregate

@@ -4845,9 +4845,15 @@ def _parse_handshake_response(data: bytes) -> Optional[Dict]:
     Empirically-verified response wire format (legacy-firmware PXC,
     derived from packet-capture analysis of the actual 91-byte response):
 
-        [4B length BE] [4B msg_type=0x33/0x34] [4B seq] [01=success]
+        [4B length BE] [4B msg_type] [4B seq] [01=success]
         [slot1 BLN \\0] [slot2 DEST \\0] [slot3 BLN \\0] [slot4 SOURCE \\0]
         [TLV: panel name] [TLV: site code] [TLV: BLN] [trailer]
+
+    `msg_type` is a header length -- `13 + the total bytes of the four
+    routing slots` (PROTOCOL.md 6.2). An earlier edition of this docstring
+    wrote it as `0x33/0x34`, which reads like a fixed pair of class bytes;
+    they are simply the two lengths this capture's node names produced.
+    Do not match on them.
 
     Response slot 4 is the panel itself (the source). Response slot 2 is
     the DEST = whoever the requester claimed to be in REQUEST slot 4.
