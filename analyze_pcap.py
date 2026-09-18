@@ -197,6 +197,9 @@ opcode_counts = Counter()      # opcode → count
 opcode_by_dir = defaultdict(Counter)  # dir_byte → opcode → count
 error_codes = Counter()
 msg_types = Counter()
+next_seq = {}                 # half-connection -> next expected stream offset
+retransmit_bytes = [0]        # duplicate bytes trimmed, for the report
+gap_bytes = [0]               # bytes missing from the capture, for the report
 unknown_opcode_samples = defaultdict(list)
 opcode_sizes = defaultdict(list)
 opcode_by_port = defaultdict(Counter)  # tcp_port → opcode → count
@@ -266,10 +269,48 @@ def process_p2_frame(frame, src_ip, src_port, dst_ip, dst_port):
         pass
 
 
-def consume_segment(segment_data, src_ip, src_port, dst_ip, dst_port):
-    """Append segment data to the directional stream and pull complete frames."""
+def consume_segment(segment_data, src_ip, src_port, dst_ip, dst_port, seq=None):
+    """Place segment data in the directional stream and pull complete frames.
+
+    PLACED, not appended. Appending in arrival order parses a retransmission's
+    bytes twice -- on this project's reference capture that is 8,677 duplicate
+    bytes and 132 phantom frames, and it inflates every count this tool prints.
+    `p2raw.half_streams` states the rule: a segment belongs at its offset from
+    the connection's lowest observed sequence number, which is the only
+    formulation that treats retransmissions, reordering and partial overlaps
+    the way a real receiver does.
+
+    p2raw can buffer the whole capture and place bytes absolutely. This streams,
+    so it carries the next expected offset per half-connection and trims a
+    segment that starts behind it.
+    """
     key = (src_ip, src_port, dst_ip, dst_port)
     buf = streams[key]
+
+    if seq is not None:
+        nxt = next_seq.get(key)
+        if nxt is None:
+            next_seq[key] = seq + len(segment_data)
+        elif seq < nxt:
+            # Behind the write cursor: a retransmission, or a segment that
+            # partially overlaps what we already hold. Keep only the new tail.
+            skip = nxt - seq
+            if skip >= len(segment_data):
+                retransmit_bytes[0] += len(segment_data)
+                return                       # wholly duplicate
+            retransmit_bytes[0] += skip
+            segment_data = segment_data[skip:]
+            next_seq[key] = seq + skip + len(segment_data)
+        elif seq > nxt:
+            # A gap -- bytes that were never captured. Any frame spanning it
+            # cannot be parsed, and carrying the stale prefix would mis-align
+            # everything after. Drop it and resynchronise on the new segment.
+            gap_bytes[0] += seq - nxt
+            buf.clear()
+            next_seq[key] = seq + len(segment_data)
+        else:
+            next_seq[key] = seq + len(segment_data)
+
     buf.extend(segment_data)
     while len(buf) >= 12:
         total_len = struct.unpack(">I", bytes(buf[:4]))[0]
@@ -315,6 +356,7 @@ def main():
            "-T", "fields",
            "-e", "ip.src", "-e", "tcp.srcport",
            "-e", "ip.dst", "-e", "tcp.dstport",
+           "-e", "tcp.seq",            # relative; needed to PLACE the segment
            "-e", "tcp.payload"]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
@@ -334,20 +376,25 @@ def main():
     n = 0
     for line in lines:
         parts = line.split("\t")
-        if len(parts) < 5 or not parts[4]:
+        if len(parts) < 6 or not parts[5]:
             continue
         try:
             src_ip = parts[0]
             src_port = int(parts[1])
             dst_ip = parts[2]
             dst_port = int(parts[3])
-            payload = bytes.fromhex(parts[4].replace(":", ""))
+            seq = int(parts[4]) if parts[4] else None
+            payload = bytes.fromhex(parts[5].replace(":", ""))
         except (ValueError, IndexError):
             continue
-        consume_segment(payload, src_ip, src_port, dst_ip, dst_port)
+        consume_segment(payload, src_ip, src_port, dst_ip, dst_port, seq)
         n += 1
 
     print(f"[*] processed {n} segments")
+    if retransmit_bytes[0] or gap_bytes[0]:
+        print(f"[*] {retransmit_bytes[0]} duplicate bytes trimmed "
+              f"(retransmissions / overlap), {gap_bytes[0]} bytes missing from "
+              f"the capture")
     print(f"[*] frames extracted (msg_types): "
           f"{sum(msg_types.values())}\n")
 
