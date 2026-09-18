@@ -218,7 +218,7 @@ A field-layout table is tagged **[S]** when its field order and types come from 
 
 #### 1.4.1.1 What `[W]` rests on: one deployment
 
-Every `[W]` claim in this document is grounded in a wire corpus of **621,268
+Every `[W]` claim in this document is grounded in a wire corpus of **623,164
 trusted P2 frames from a single site** — one BLN, one supervisor, and **five
 distinct panels**, which is the count that answers the port enumeration of
 §16.1. That is a large corpus and a narrow one, and the narrowness has a
@@ -238,7 +238,7 @@ alarm printing enabled on three ports. Wherever a claim rests on a difference
 *between panels*, that difference is real evidence. Wherever it rests on
 something all five share, it is still one site.
 
-**And the body-level figures are a 1% sample.** Frame-level counts — 621,268
+**And the body-level figures are a 1% sample.** Frame-level counts — 623,164
 frames, the direction split, the `msg_type` distribution — are over the whole
 corpus. **Body-level figures are not.** Bodies are cached for analysis at the
 **first 60 per opcode**, taken in capture order, giving **4,377 bodies out of
@@ -379,8 +379,8 @@ are P2 operations a client will see; it does not document BACnet.
 
 **Nobody has it.** The supervisor's P2/IP **frame builder** is not present in any
 binary examined, and the ASDU catalog contains no transport-header structure. The
-`msg_type` rule of §6.2 therefore rests on wire evidence alone — 620,532 frames
-of 621,268 — with no `[S]`, `[S]` or `[S]` corroboration available to add.
+`msg_type` rule of §6.2 therefore rests on wire evidence alone — 622,428 frames
+of 623,164 — with no `[S]`, `[S]` or `[S]` corroboration available to add.
 
 **What you *can* rely on.** Everything tagged `[S]` comes from the vendor's own
 type system and does not depend on this corpus at all: field order, field types,
@@ -1034,7 +1034,7 @@ behavior an operator reported to this project. [D][OPEN]
 
 > **Evidence basis for this whole section, stated plainly.** Every claim in §4.2
 > is **[D]** — vendor documentation, not observation. **This corpus contains no
-> AEM traffic whatsoever**: of 621,268 trusted frames, 431,463 are on native
+> AEM traffic whatsoever**: of 623,164 trusted frames, 431,463 are on native
 > TCP/5033 and **zero** are on TCP/3001. Nothing here has been checked against a
 > capture, the serial-BLN framing inside such a stream remains **[OPEN]** (§4.3,
 > §4.5), and a capture from an AEM Channel 1 would be one of the more valuable
@@ -1150,7 +1150,7 @@ BLN**. All values in seconds. [D]
 | Tombstone lifetime | 86400 | 86400 |
 
 **Measured against the wire.** Five opcodes run on a fixed period, measured per
-peer connection across 621,268 frames — every one with a median absolute
+peer connection across 623,164 frames — every one with a median absolute
 deviation of **0.00 s**: [W]
 
 | Opcode | Period | Intervals | Connections |
@@ -1246,7 +1246,7 @@ body_length = 25 + len(node_name) + len(site_name) + len(bln_name)
   25 = 3 TLV headers (3 bytes each) + the 16-byte fixed tail
 ```
 
-All three name lengths are site and node configuration; only the 25 is a protocol constant. Checked against every distinct body size observed: `25+5+3+7 = 40`, `25+6+3+7 = 41`, `25+15+3+7 = 50` — the last being a supervisor identity of 15 characters. Substituting this site's `site_name` (3) and `bln_name` (7) collapses it to the old `35 + node-name length`, which is how the site-specific terms went unnoticed across 621,268 single-site frames. [W] **Whether a ping is answered depends on which side opened the session.** Every
+All three name lengths are site and node configuration; only the 25 is a protocol constant. Checked against every distinct body size observed: `25+5+3+7 = 40`, `25+6+3+7 = 41`, `25+15+3+7 = 50` — the last being a supervisor identity of 15 characters. Substituting this site's `site_name` (3) and `bln_name` (7) collapses it to the old `35 + node-name length`, which is how the site-specific terms went unnoticed across 623,164 single-site frames. [W] **Whether a ping is answered depends on which side opened the session.** Every
 *supervisor-initiated* `0x4640` in the corpus drew a reply. Panel-initiated pings
 into a supervisor's `5033` may not: in a 25-minute capture at one supervisor, nine
 panels each opened a fresh TCP connection to its `5033` every **14.0 seconds**,
@@ -1610,7 +1610,7 @@ followed by an opcode-specific body. [W]
 | 12 | `dir` | u8 | Direction byte: `0x00` request/push, `0x01` success, `0x05` error (§6.3). | [W] |
 | 13 | `slot[0]` | ASCIIZ | BLN name. | [W] |
 | … | `slot[1]` | ASCIIZ | Destination node name (on a request) / source node name (on a response). | [W] |
-| … | `slot[2]` | ASCIIZ | BLN name. Identical to slot[0] in 621,263 of 621,268 frames here — but this corpus is single-BLN, and §6.4 gives a `(trunk, node)` pair reading under which slots 0 and 2 would differ on a cross-BLN frame. **[OPEN]** | [W] |
+| … | `slot[2]` | ASCIIZ | BLN name. Identical to slot[0] in 623,159 of 623,164 frames here — but this corpus is single-BLN, and §6.4 gives a `(trunk, node)` pair reading under which slots 0 and 2 would differ on a cross-BLN frame. **[OPEN]** | [W] |
 | … | `slot[3]` | ASCIIZ | Source node / self identity (on a request) / destination (on a response). | [W] |
 | `S` | `opcode` | u16 BE | The 2-byte AP2 function code. **Present if and only if `dir == 0x00`** (§6.4). | [W] |
 | `S+2` | `body` | bytes | Opcode-specific request body, or — on a response — the result payload / 2-byte error tail. | [W] |
@@ -1699,12 +1699,12 @@ does not need thirty-two bits. A length does.
 
 #### 6.2.2 The evidence
 
-Every figure here is over the 621,268 trusted frames of the corpus, and none of
+Every figure here is over the 623,164 trusted frames of the corpus, and none of
 it needed a capture that did not already exist: [W]
 
 | test | result |
 |---|---|
-| `msg_type == 13 + total slot bytes` | **620,532 of 621,268 — 99.88%** |
+| `msg_type == 13 + total slot bytes` | **622,428 of 623,164 — 99.88%** |
 | header length (frame length − body length) | exactly `msg_type` on every response, `msg_type + 2` on every request — the 2 being the opcode a request carries and a response does not |
 | the 736 exceptions | **every one** from this project's own two research hosts. Not one from a supervisor or a panel |
 | do the "classes" partition by host? | no. **One host emits all four** of `0x2E`, `0x2F`, `0x33`, `0x34` |
@@ -1830,7 +1830,7 @@ Exactly three values are defined. [W]
 | `0x01` | success response | a result body (may be empty); **no opcode** | [W] |
 | `0x05` | error response | exactly 2 bytes — a u16 BE error code (§7.2); **no opcode**. Validated across the corpus: all **6,006** error responses have a 2-byte body, with no exceptions. | [W] |
 
-Observed corpus distribution: `0x00` 314,273; `0x01` 300,989; `0x05` 6,006 (summing to 621,268). [W]
+Observed corpus distribution: `0x00` 316,169; `0x01` 300,989; `0x05` 6,006 (summing to 623,164). [W]
 
 The governing rule is: **the opcode field is present if and only if `dir == 0x00`.** A response of
 either kind carries no opcode. An unsolicited push — for example a change-of-value report (opcode
@@ -1847,7 +1847,7 @@ carry no length prefix — distinct from the length-prefixed TLV form (`<textTyp
 inside bodies; the two MUST NOT be conflated. [W]
 
 **There are always exactly four, and the count is not conditional on anything** —
-direction, `msg_type`, opcode or body: **621,268 frames of 621,268** carry
+direction, `msg_type`, opcode or body: **623,164 frames of 623,164** carry
 four, with no exceptions. A parser may therefore read four NUL-terminated
 strings unconditionally after the header and does not need to probe for a
 terminator count. [W]
@@ -1909,8 +1909,8 @@ with the trunk it lives on. The duplication is then not redundancy at all; it is
 and both pairs happen to name the same trunk on a single-BLN network.
 
 That is a **falsifiable prediction**: on a frame that crosses between two BLNs, slots 0 and 2 should
-carry **different** trunk names. The present corpus cannot test it — across **621,268** trusted
-four-slot frames, slots 0 and 2 are identical in **621,263**, and all five exceptions are
+carry **different** trunk names. The present corpus cannot test it — across **623,164** trusted
+four-slot frames, slots 0 and 2 are identical in **623,159**, and all five exceptions are
 `dir == 0x00` research probes from one capture, with a deliberately mismatched BLN name, not
 production traffic. Every capture to hand is
 single-BLN, so the pair reading is **untested on the wire**. A capture taken where two BLNs
@@ -2381,7 +2381,7 @@ wire format forbids a retry; nothing here performs one. [W]
 #### 7.2.2 Observed wire error codes
 
 These 2-byte codes appear as the `dir == 0x05` error tail in the corpus. Distribution across the
-621,268 trusted P2 frames, of which 6,006 are error responses: `0x0003` 5,805; `0x00AC` 127;
+623,164 trusted P2 frames, of which 6,006 are error responses: `0x0003` 5,805; `0x00AC` 127;
 `0x0E15` 38; `0x0002` 28; `0x0E11` 4; `0x0E12` 3; `0x0009` 1 - summing exactly to 6,006. **`not_found` is 97% of all errors.** [W]
 
 | Wire code | Meaning | How established | Tag |
@@ -3236,7 +3236,7 @@ The AP2 function code is a 16-bit big-endian value that sits on the wire immedia
 
 The complete command vocabulary of the protocol is defined by the vendor's `AP2_Function_Code` enumeration: **641 named members across 630 distinct opcode values** (a handful of values carry two names — historical aliases such as `AP2_DUMMY_CMD`/`AP2_REV_STRING` at 0x0100, or the `CONTROLLER`/`TEC` doublets). The enum's numeric values **are** the wire opcodes: cross-checking every opcode seen on the wire against the enum, all matched exactly. [S]
 
-Of the 630 defined values, **135 are observed in the capture corpus** (621,268 trusted P2 frames across the 121 captures that carry P2; see §9.5 for the counting criteria and for why an earlier figure of 135 was withdrawn); the remaining 495 are defined-but-unobserved (overwhelmingly configuration, database-management, upload, and BACnet/LON-integration operations that a passive supervisor↔panel capture does not exercise). A further **15 opcode values appear on the wire without an enum definition at all** and therefore have no catalog row; thirteen of them are real panel operations and two are artifacts of a deliberately malformed test frame (§9.5). Counting those, **148 distinct operations** have been observed. Every defined opcode is enumerable from the catalog below; "not observed" means absent from this corpus, not undefined. The corpus combines passive supervisor↔panel and panel↔panel site captures with a smaller set of active read/enumeration test captures; opcode counts are corpus frequencies, not a claim about steady-state operation. [W][S]
+Of the 630 defined values, **135 are observed in the capture corpus** (623,164 trusted P2 frames across the 121 captures that carry P2; see §9.5 for the counting criteria and for why an earlier figure of 135 was withdrawn); the remaining 495 are defined-but-unobserved (overwhelmingly configuration, database-management, upload, and BACnet/LON-integration operations that a passive supervisor↔panel capture does not exercise). A further **15 opcode values appear on the wire without an enum definition at all** and therefore have no catalog row; thirteen of them are real panel operations and two are artifacts of a deliberately malformed test frame (§9.5). Counting those, **148 distinct operations** have been observed. Every defined opcode is enumerable from the catalog below; "not observed" means absent from this corpus, not undefined. The corpus combines passive supervisor↔panel and panel↔panel site captures with a smaller set of active read/enumeration test captures; opcode counts are corpus frequencies, not a claim about steady-state operation. [W][S]
 
 Rows that were seen on the wire are tagged **[W]** and carry their frame count; defined-but-unobserved rows are tagged **[S]** (struct/metadata-derived from the vendor enum — definitional truth). Wire counts in the catalog come from the corpus census; per-opcode response shapes, error tails, and `msg_type` distributions are in §9.7.
 
@@ -3620,7 +3620,7 @@ Whatever the panel writes the number into, **it is not a P2 frame**. [W]
 
 *Coverage, since a negative is only as good as its denominator.* The corpus holds
 764 capture files, 271 distinct by content, of which **121 carry P2 and hold
-621,268 trusted frames between them** — and all 121 were in scope, 100% of frames.
+623,164 trusted frames between them** — and all 121 were in scope, 100% of frames.
 Both ports are represented: 432,368 frames on 5033 and 188,900 on 5034, so the
 result is not an artifact of testing only the supervisor-facing channel. [W]
 
@@ -3806,7 +3806,7 @@ the block's age rather than of its non-existence.
 
 ### 9.5 The catalog
 
-The catalog below is generated by joining the vendor `AP2_Function_Code` enum (the 630 distinct opcode values) with the corpus census. A recount under stated criteria — trusted frames only, `dir == 0x00` only, content-deduplicated captures — gives **150 distinct opcode values across 314,273 request/push frames**, of which 135 carry a name from the enum. Two of the 150 are not operations at all (below), so **148 distinct operations** have been observed. (Three further values appear only in frames the parser marked untrusted after a resynchronisation: `0x0631`, `0x1826`, `0x2226`. `0x1826` is precisely the fictitious opcode a mid-record resync manufactures — a TLV length `0x18` followed by ASCII `&` — and is the reason the trusted flag exists. Editions of this document have cited 135, then 125, then 127; each was the honest count over the corpus held at the time, and the corpus has twice grown. The current figure is reproducible from the stated criteria by re-running the census.) Columns: hex opcode, name(s), observed wire count (or `-`), notes (destructive flag where applicable), and evidence tag ([W] wire-observed, [S] enum-defined). Within each family, rows are sorted by opcode value. Fifteen wire values do **not** appear in the catalog, because the enum does not define them, and they fall into three groups rather than one. **Four are artifacts.** `0x0C44` and `0x4443` are slot-walk misalignments of `0x4640`; `0x0000` and `0xFFFF` are the opcode field of a *deliberately malformed* test frame whose routing slots read `GARBAGEBLN` / `garbagenode` / `GARBAGE15CHARSXX`, sent once each to probe the handshake gate and never answered. Neither is an operation, and a reader reproducing the census should expect to see them and discard them. [W] **One is unimplemented:** `0x0510` drew `not_found`. [W] **The remaining ten — `0x4641`, `0x4642`, `0x4643`, `0x4647`, `0x464A`, `0x464B`, `0x464D`, `0x464E`, `0x464F`, `0x4650` — are real panel operations, and an earlier reading of this document that dismissed them as noise is withdrawn.** Absence from `AP2_Function_Code` proves nothing: that enum is the **supervisor-side** vocabulary and does not describe what a panel implements. Classify by what the panel did. `0x464A`–`0x4650` each answered `dir=0x01` **success with distinct structured bodies** (0 B, 22 B, 125 B, a 12,073-byte declared node table, 117 B, 26 B, 217 B respectively), and `0x4641` answered success, while `0x0510` — equally absent from the enum — answered `not_found` from the same panel in the same campaign. The `0x464D` reply is the sharpest case and needs stating precisely: the panel answered, and its response header **declared** 12,073 bytes of node table, of which **4,380 arrived** before the client reset the connection. No complete frame exists, so a strict framer reports the exchange as unanswered — it was not. A panel that begins streaming 12 KB of structured node table for one value and answers `not_found` to another is not treating them alike. `0x4642`/`0x4643` answered `not_supported`, i.e. a handler was reached and refused; `0x4647` returned nothing at all and remains **[OPEN]**. Low frame count is not evidence of unreality — it measures how often the *supervisor* uses an operation, and a panel-side operation the supervisor never invokes is expected to appear exactly once, when probed. [W]
+The catalog below is generated by joining the vendor `AP2_Function_Code` enum (the 630 distinct opcode values) with the corpus census. A recount under stated criteria — trusted frames only, `dir == 0x00` only, content-deduplicated captures — gives **150 distinct opcode values across 316,169 request/push frames**, of which 135 carry a name from the enum. Two of the 150 are not operations at all (below), so **148 distinct operations** have been observed. (Three further values appear only in frames the parser marked untrusted after a resynchronisation: `0x0631`, `0x1826`, `0x2226`. `0x1826` is precisely the fictitious opcode a mid-record resync manufactures — a TLV length `0x18` followed by ASCII `&` — and is the reason the trusted flag exists. Editions of this document have cited 135, then 125, then 127; each was the honest count over the corpus held at the time, and the corpus has twice grown. The current figure is reproducible from the stated criteria by re-running the census.) Columns: hex opcode, name(s), observed wire count (or `-`), notes (destructive flag where applicable), and evidence tag ([W] wire-observed, [S] enum-defined). Within each family, rows are sorted by opcode value. Fifteen wire values do **not** appear in the catalog, because the enum does not define them, and they fall into three groups rather than one. **Four are artifacts.** `0x0C44` and `0x4443` are slot-walk misalignments of `0x4640`; `0x0000` and `0xFFFF` are the opcode field of a *deliberately malformed* test frame whose routing slots read `GARBAGEBLN` / `garbagenode` / `GARBAGE15CHARSXX`, sent once each to probe the handshake gate and never answered. Neither is an operation, and a reader reproducing the census should expect to see them and discard them. [W] **One is unimplemented:** `0x0510` drew `not_found`. [W] **The remaining ten — `0x4641`, `0x4642`, `0x4643`, `0x4647`, `0x464A`, `0x464B`, `0x464D`, `0x464E`, `0x464F`, `0x4650` — are real panel operations, and an earlier reading of this document that dismissed them as noise is withdrawn.** Absence from `AP2_Function_Code` proves nothing: that enum is the **supervisor-side** vocabulary and does not describe what a panel implements. Classify by what the panel did. `0x464A`–`0x4650` each answered `dir=0x01` **success with distinct structured bodies** (0 B, 22 B, 125 B, a 12,073-byte declared node table, 117 B, 26 B, 217 B respectively), and `0x4641` answered success, while `0x0510` — equally absent from the enum — answered `not_found` from the same panel in the same campaign. The `0x464D` reply is the sharpest case and needs stating precisely: the panel answered, and its response header **declared** 12,073 bytes of node table, of which **4,380 arrived** before the client reset the connection. No complete frame exists, so a strict framer reports the exchange as unanswered — it was not. A panel that begins streaming 12 KB of structured node table for one value and answers `not_found` to another is not treating them alike. `0x4642`/`0x4643` answered `not_supported`, i.e. a handler was reached and refused; `0x4647` returned nothing at all and remains **[OPEN]**. Low frame count is not evidence of unreality — it measures how often the *supervisor* uses an operation, and a panel-side operation the supervisor never invokes is expected to appear exactly once, when probed. [W]
 
 <!-- BEGIN GENERATED CATALOG (do not hand-edit; regenerate with working/sweep/s91_gencatalog.py, which joins p2_data.py with the census of working/sweep/s90_census.py) -->
 
@@ -4808,18 +4808,18 @@ changing panel state and left alone.
 
 The corpus distribution grounds the catalog in observed behavior:
 
-- **`msg_type` values.** Six distinct values occur in this corpus. They are **not** classes: `msg_type` is `13 + the total bytes of the four routing slots` (§6.2), so a value is a *sum of node-name lengths* and the six reflect this site's naming, not a protocol taxonomy. Another site produces other values. The census is kept because the frame counts are real, with the old role names struck through; any low-byte value outside the set below is parser noise from a desynced stream. Corpus distribution, over **621,268 trusted frames in 121 distinct P2-carrying captures** (content-deduplicated; criteria stated because an earlier edition of this table gave counts that cannot be reproduced from the evidence base, see the note below):
+- **`msg_type` values.** Six distinct values occur in this corpus. They are **not** classes: `msg_type` is `13 + the total bytes of the four routing slots` (§6.2), so a value is a *sum of node-name lengths* and the six reflect this site's naming, not a protocol taxonomy. Another site produces other values. The census is kept because the frame counts are real, with the old role names struck through; any low-byte value outside the set below is parser noise from a desynced stream. Corpus distribution, over **623,164 trusted frames in 121 distinct P2-carrying captures** (content-deduplicated; criteria stated because an earlier edition of this table gave counts that cannot be reproduced from the evidence base, see the note below):
 
   | Value | = 13 + slot bytes | slot name lengths | Frames |
   |---|---|---|---:|
   | `0x33` | 51 | 7+15+7+5 | 420,024 |
   | `0x29` | 41 | 7+5+7+5 | 100,200 |
-  | `0x2E` | 46 | 7+10+7+5 | 42,542 |
+  | `0x2E` | 46 | 7+10+7+5 | 44,438 |
   | `0x34` | 52 | 7+15+7+6 | 40,962 |
   | `0x2A` | 42 | 7+6+7+5 | 12,556 |
   | `0x2F` | 47 | 7+10+7+6 | 4,984 |
 
-  These sum to the 621,268 trusted frames of 9.5. **The peer carriers moved
+  These sum to the 623,164 trusted frames of 9.5. **The peer carriers moved
   by four orders of magnitude when panel-side captures entered the corpus**
   - `0x29` from 10 frames to 100,200, and `0x2A` from zero to 12,556 -
   because a supervisor-side tap structurally cannot observe a
@@ -4841,8 +4841,8 @@ The corpus distribution grounds the catalog in observed behavior:
 
   Two independent panels each speak `0x29` to every peer they have **and `0x2A` to that one node**. A single vantage could not distinguish this from "one link happens to differ"; two vantages on two devices make it a per-node property. The deduction "per-node property" was right and the identification was wrong: the property is the **length of that node's name** (§6.2). One node on this BLN has a six-character name where its peers have five, so every frame addressed to it sums one higher. An implementer should therefore select the peer carrier **per peer**, from what that peer presents, and must not assume one carrier BLN-wide. Which of the two is the newer generation is **[OPEN]**: it needs `0x010C CABINET_DISPLAY` read from the odd node. [W]
 
-  > **Why the numbers changed.** A previous edition of this list gave 433,425 / 43,668 / 43,780 / 7,322 / 2,200 / 296, totalling 530,691 frames. That total is reproducible from neither the deduplicated corpus (621,268) nor a naive count over all 764 capture files including duplicates (1,326,186), and both counts put `0x2A` at zero in the supervisor-side set. The likeliest explanation is now a mundane one: the corpus has since been shown to have been **incomplete** — thirty-four captures, 271,636 frames, were recovered into it after this note was first written — so an earlier edition counting a capture set that no longer existed in the evidence tree is exactly what one would expect. The figures here are replaced with counts reproducible from the current corpus under the stated criteria, and a reader who reproduces them should expect them to move again if the corpus grows. [W]
-- **Direction byte.** 0x00 request/push (314,273), 0x01 success response (300,989), 0x05 error response (6,006) - summing exactly to the 621,268 trusted frames of 9.5. A success response carries the operation's payload after the routing slots; an error response carries exactly a 2-byte error code and nothing else. [W]
+  > **Why the numbers changed.** A previous edition of this list gave 433,425 / 43,668 / 43,780 / 7,322 / 2,200 / 296, totalling 530,691 frames. That total is reproducible from neither the deduplicated corpus (623,164) nor a naive count over all 764 capture files including duplicates (1,326,186), and both counts put `0x2A` at zero in the supervisor-side set. The likeliest explanation is now a mundane one: the corpus has since been shown to have been **incomplete** — thirty-four captures, 271,636 frames, were recovered into it after this note was first written — so an earlier edition counting a capture set that no longer existed in the evidence tree is exactly what one would expect. The figures here are replaced with counts reproducible from the current corpus under the stated criteria, and a reader who reproduces them should expect them to move again if the corpus grows. [W]
+- **Direction byte.** 0x00 request/push (316,169), 0x01 success response (300,989), 0x05 error response (6,006) - summing exactly to the 623,164 trusted frames of 9.5. A success response carries the operation's payload after the routing slots; an error response carries exactly a 2-byte error code and nothing else. [W]
 - **Error tail values (the 2-byte code on a 0x05 response).** `0x0003` not-found / unrecognized-opcode (5,805×), `0x00AC` not-supported (49×), `0x0E15` physical-point-not-commandable (28×), `0x0002` invalid-operation (4×), `0x0E11` FLN-invalid-drop-number (2×), `0x0E12` FLN-device-failed (3×), `0x0009` already-exists (1×). See §7.2.2; `0x0E1x` is the FLN band. An opcode the panel does not implement returns `0x05 ... 00 03`; this is how the defined-but-unimplemented-on-this-firmware opcodes announce themselves on the wire. [W]
 - **Per-opcode response shapes.** Response lengths vary by opcode and by the addressed object; representative shapes from the census (opcode → success-response sizes): 0x010C → 230/231 B (firmware/identity block, §10.5); 0x0220 (read) → 126/138 B or `err 0003` when the point is absent; 0x0271 (COV enable) → 96/108 B; 0x0274 (annunciate) → 0 B (acknowledged, no payload); 0x4640 → 40/41/45/47 B at this site (three TLVs + a 16-byte tail; the length follows the *sender's* node name, not the addressee's — see §7.1); 0x0981 (enumerate points) → 88/115/118 B. The "0 B success" pattern (direction 0x01, empty body) is a bare acknowledgement used by push/command/replication opcodes. [W] **A request may also carry a zero-length body**, and 220 in the corpus do: `0x010C` (163×), `0x4633 EBLN_REPL_NOTIFY` (22×), `0x0951 DBCHANGE_POINT` (11×), `0x0100` (9×) and the rest of the `DBCHANGE` family. This is the natural encoding of a **parameterless operation** — the `u16` opcode is the whole message. An encoder must be willing to emit an ASDU of length zero, and a decoder must accept it as complete rather than truncated: after the two opcode bytes are taken off, `total - 2` is legitimately 0. [W]
 
