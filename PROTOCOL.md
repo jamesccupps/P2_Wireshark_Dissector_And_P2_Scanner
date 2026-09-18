@@ -8444,6 +8444,15 @@ as **[OPEN]**.
 > programs**, not about the language: an absent keyword is one nobody here
 > wrote, and a parser must still accept all 66. It does say which half of the
 > language a decoder will meet first. [W][S]
+>
+> **The 66 are the APOGEE / Insight-era vocabulary, which is what this corpus
+> contains.** The PXC.A generation (PXC4/5/7.A) is documented separately, in the
+> *Proprietary* Program Control Language manual (A6V10374898 — note the rename
+> from *Powers*), which **adds** `GETVAL` / `SETVAL` for BACnet property access
+> and **removes ten statements** as obsolete. Neither appears here: `GETVAL` and
+> `SETVAL` occur in **zero** of the 2,644 lines, which is what a pre-PXC.A site
+> should look like. A parser meant to cover both generations needs that manual
+> as well as this section. [W][D]
 
 PPCL statements fall into functional categories; the panel stores each statement with a **token byte** identifying the statement type. The complete token set is the 71-entry statement-type table (vendor enum `PPCL_statement_type`, members prefixed `WHOP*` = "what-opcode"); it is reproduced in full in the appendix (cross-ref Appendix — PPCL statement-type token table). [S] The functional grouping: [D/S]
 
@@ -8498,6 +8507,28 @@ operator has two spellings** — a bare word and a dot-delimited form — and bo
 are reserved, so a tokenizer must accept `.GT.` and `GT` as the same operator.
 And **the dotted forms include `.ROOT.`**, an operator with no bare-word
 comparison analogue, which a grammar derived only from the word list will miss.
+
+#### Resident points and status words — referenced by programs, absent from the point database
+
+A PPCL program also names values the **panel itself** maintains. They are not
+point-database entries, they are not returned by a point enumerate, and a client
+that resolves every name in a program against the point list will fail on them.
+**Twelve occur in this corpus's own recovered program source** — the counts are
+over the 2,644 lines of the note above: [W][D]
+
+| Kind | Words | Observed here |
+|---|---|---|
+| Clock / calendar | `TIME` (military), `CRTIME` (decimal hours), `DAY`, `DAYOFM`, `MONTH` | `DAY` 109, `CRTIME` 22, `TIME` 8 |
+| Interval timers | `SECNDS`, `SECND1`–`SECND7` | `SECND1` 3, `SECND3` 2, `SECND4` 2, `SECND2` 1 |
+| Point status | `OK`, `FAILED`, `HAND`, `LOW`, `DEAD`, `STATE` | `LOW` 28, `FAILED` 6 |
+| Alarm state | `ALMACK`, `ALMCNT`, `ALMCT2`, `ALMPRI` | `ALMCNT` 8 |
+| Accumulator / scope | `TOTAL`, `LOCAL`, `$BATT`, `$PDL` | `TOTAL` 16, `LOCAL` 8 |
+
+**The implementer consequence is the whole reason this is here.** Reading a
+program back with `UPL_ALL_PPCL` (`0x0985`, §14.5.1) gives source that
+references these freely. They must be recognised as panel-resident and skipped,
+not reported as dangling references — and equally not *rejected*, which is the
+same mistake §14.3's reserved-word note warns about from the other direction.
 
 #### `OIP` — a program can execute operator functions
 
@@ -8627,6 +8658,17 @@ be used in one PPCL statement."* An operand is a point reference or a constant;
 an operator is each arithmetic, relational or logical operation the expression
 performs. A statement can therefore exceed neither, and a generator that checks
 only the operand count will emit lines a panel rejects. [D]
+
+> **And the operand limit is 13, not 16, on the older firmware families —
+> including the generation this corpus was captured from.** The *Powers Process
+> Control Language User's Manual* (125-1896 Rev. 5) states an `IF` may test a
+> maximum of **13 operands**; the Desigo CC PPCL Editor documentation states
+> **16 operands and 32 operators**. Both are published and **neither retracts
+> the other**, so they are best read as the limits of two different compilers.
+> A generator should apply 16 only where it knows it is targeting the newer
+> editor, and **13 otherwise** — a statement near either limit should be split
+> regardless, because a 14-operand `IF` is unreadable whichever figure is
+> right. [D]
 
 **Three more constraints a program writer has to satisfy, from the compiler's
 own error set:** [D]
