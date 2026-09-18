@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.9.1 — the correction to the correction (2026-09-18)
 
 ### `PROTOCOL.md` §14.3 — `EQUAL` and `LESS` are reserved words after all
 

@@ -13,6 +13,22 @@ equipment. This repository contains three things:
 The dissector is built and validated from wire captures; the opcode names are the
 protocol's AP2 function-code vocabulary.
 
+> **v2.9.1 — `EQUAL` and `LESS` are reserved words after all.** v2.9.0
+> removed them from `PROTOCOL.md` §14.3's PPCL reserved-word set, reasoning that
+> they were a two-column vendor table's *description* column read as tokens.
+> **That correction was wrong.** Both words appear in two independent vendor
+> *enumerations* — the Insight Program Editor's reserved-word page and
+> 125-1896 Rev. 5 chapter 5 — each in its own alphabetical cell, on pages with
+> no description column at all. **If you built a PPCL tokenizer or linter from
+> v2.9.0, its reserved-word list is two entries short.** What no edition had
+> right: they are reserved *names*, not operators — no vendor source documents
+> a syntax for either.
+>
+> §14's resident-point table is also corrected: `LOCAL` is a **declaration
+> keyword**, `TOTAL` a **function**, `LOW` and `FAILED` **status values**. A
+> client resolving those as resident points reads the statements wrong.
+> Full account in the [changelog](CHANGELOG.md).
+>
 > **v2.9.0 — the correctness pass.** Nine defects in shipped code, and a
 > corpus recount. **If you are running 2.8.2, four of them are producing wrong
 > output on your captures right now**: the dissector's Info column warned on
@@ -32,12 +48,8 @@ protocol's AP2 function-code vocabulary.
 > survives. The dialect probe and its cache are gone from the scanner, and every
 > connect is now the fast path.
 >
-> **v2.8.2 — the decode side.** A request may carry a **zero-length body** — 220
-> in the corpus do, and it is how a parameterless operation is encoded: the `u16`
-> opcode is the whole message. And the opcode's high byte is a **structural**
-> family band, not a descriptive one: the supervisor's AP2 command factory
-> switches on `opcode & 0xFF00`.
->> Earlier releases are in the [changelog](CHANGELOG.md).
+>
+> Earlier releases are in the [changelog](CHANGELOG.md).
 
 Click a P2 packet and get:
 
