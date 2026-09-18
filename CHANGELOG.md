@@ -1,6 +1,118 @@
 # Changelog
 
-## Unreleased — correction
+## Unreleased — correctness pass
+
+Nine defects in shipped code, and a corpus recount that moved every aggregate
+figure in `PROTOCOL.md`. If you are running 2.8.2, the first four are producing
+wrong output on your captures right now.
+
+### `p2.lua` — the Info column was inverted on the header-length check
+
+Every well-formed **request** frame rendered `[hdrlen 51/=53]`, and a frame
+whose header length was **exactly 2 too large rendered clean**. The comparison
+used an offset already advanced past the opcode, so `hdrlen == off + 2` compared
+equal precisely when `hdrlen` was itself 2 too large.
+
++2 is what you get by counting the `u16` opcode into the header length — the
+most likely way to get that field wrong. So the dissector cried wolf on correct
+traffic and stayed silent on the one error it exists to catch. On a 17,926-frame
+reference capture that is ~9,500 false warnings.
+
+The `p2.hdr_len_mismatch` *field* was always correct; only the column lied. A
+filter-driven workflow was unaffected.
+
+### `p2.lua` — a `0x00`-typed string TLV truncated or corrupted a record
+
+`PROTOCOL.md` §8.1 defines `TEXT_` as `<textType:u8> <textLen:u16>`, and
+textType is `0x00` on 24 of 113,523 corpus TLVs — all empty strings, across
+`eng_units`, `name`, `suffix` and `descriptor`. Three anchored decoders tested
+`~= 0x01` and **`break`**, one tested `== 0x01` and skipped the advance:
+
+- a COV point whose empty **suffix** was `0x00`-typed reported its value as
+  **`9.24856986e-44` instead of `72.25`** — the suffix header read as the `f32`.
+  A plausible-looking wrong point value, silently.
+- a COV point whose **name** was `0x00`-typed decoded **zero points**: the
+  `break` abandoned the whole record, not that one point.
+- `dissect_roster` and `dissect_identity` truncated the same way.
+
+Fixed at the anchored sites. The unanchored *scanning* loops deliberately stay
+strict — widening those as well replaced point names with empty strings in 976
+of 82,294 corpus rows, because in a loop that advances a byte on no match every
+`0x00` becomes a TLV candidate.
+
+### `p2.lua` — the node-name table walked past its own count
+
+`dissect_roster` ignored `r_count` and walked to the end of the buffer. The
+table ends with four zero bytes; the old textType test stopped there for the
+wrong reason, so fixing that exposed a blank 15th node. It now walks the
+declared count.
+
+### `analyze_pcap.py` — every retransmitted frame was counted twice
+
+Segments were appended in arrival order, so a retransmission's bytes entered the
+stream again and its frames were parsed again. **Every count the tool printed
+was inflated** — on the reference capture, 18,056 frames reported against 17,924
+real, `0x0274` reading 4,498 against 4,486.
+
+Segments are now placed at their offset from the connection's lowest sequence
+number, which handles retransmission, reordering and partial overlap the way a
+receiver does. Duplicate and missing bytes are reported rather than absorbed.
+
+### `analyze_pcap.py` — 558 known opcodes were reported as unknown
+
+It hand-maintained 80 opcode names beside `p2_data.py`'s generated 638, under a
+comment asking a person to mirror new ones in by hand. Anything outside the 80
+printed as `*** UNKNOWN *** <-- NEW`. Worse, **73 of the 80 labels contradicted
+the catalog** — pre-enumeration guesses the AP2 name set later overturned.
+`p2_data` is now the only name source; seven labels carrying a wire
+*observation* rather than a name are kept as notes.
+
+### `PROTOCOL.md` — low figures, and a procedure that contradicted itself
+
+**Corpus recount.** The project's raw reader silently discarded half-connections
+whose TCP port had been reused — on one capture, **782 of 3,211 conversations**.
+Recounted with three independent tools, which agree exactly:
+
+    trusted frames        621,268 -> 623,164
+    direction 0x00        314,273 -> 316,169
+    msg_type 0x2E          42,542 ->  44,438
+    msg_type == 13+slots  620,532 -> 622,428   still 99.88%
+    error codes, 121 captures, 135 of 630 opcodes   unchanged
+
+Every recovered frame is a request with identical BLN slots; both exception
+counts are untouched and only the denominators grew.
+
+**§7.3's client procedure** told a reader, in step 2, to "frame it on the
+second-channel class matching the peer's generation — `0x2E` legacy, `0x2F`
+modern" — three steps before step 5 withdraws exactly that. A wrong `msg_type`
+is **dropped, not rejected**, so following step 2 gives no error, just a peer
+that never answers.
+
+**§1's Summary** described the string TLV as `01 00 <len> <ascii>` — the
+one-byte-length form §8.1 withdraws — on the document's first screen.
+
+**§8.2's scope-tag example** leads with `scope_byte=0x23`; a plain read uses
+`0x00` (17,650 requests against 1,061). The example now says so.
+
+### Provenance
+
+Evidence tags `[F]` (firmware-attested) and `[C]` (codec-attested) are collapsed
+into `[S]`, and ~45 sentence-level attributions moved to neutral specification
+vocabulary. **No claim changed** — what changed is whether the text says how a
+fact was learned. `PROTOCOL.md` is now generated from an internal source
+document; edit that and regenerate.
+
+### Testing
+
+The repository had no tests. It now has, in the analysis harness rather than the
+package: a committed-vs-edited field diff for `p2.lua` over the corpus (82,294
+rows); synthetic captures for the header-length and TLV cases the corpus does
+not contain; a three-way frame census across the raw reader, the dissector and
+the analyzer; and a codec built from `PROTOCOL.md` alone whose selftest
+round-trips real capture frames — **144,156 frames over three captures, every
+one re-encoded byte-identically.**
+
+## Unreleased — the `msg_type` correction (earlier in the same cycle)
 
 **The "message class" model is withdrawn.** Earlier entries in this file, and
 releases up to 2.8.2, described the `u32` at frame offset 4 as a message class
