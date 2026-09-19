@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+### `analyze_pcap.py`: a four-tuple is not a connection
+
+The inventory tool keyed its reassembly buffers on
+`(src_ip, src_port, dst_ip, dst_port)`. A peer that closes and reconnects from
+the same ephemeral port — what tshark labels **[TCP Port numbers reused]** —
+restarts near zero under relative sequence numbers, while the reader is holding
+a write cursor far past it. **Every byte of the second connection read as a
+retransmission and was discarded**, counted into the duplicate tally and never
+mentioned.
+
+Not hypothetical. Across the 40 P2-bearing captures in the corpus, three carry
+port reuse, and on one of them it is **806 of 3,211 four-tuples**:
+
+| | four-tuple key | with `tcp.stream` |
+|---|---:|---:|
+| frames | 124,123 | **125,237** |
+| request opcodes | 63,649 | **64,763** |
+| bytes called retransmissions | 99,625 | 1,593 |
+
+**1,114 frames, 0.9%, silently gone.** `p2raw` solves the same problem by
+splitting generations on a sequence jump; a streaming reader cannot look ahead,
+but tshark already knows the answer and will say so for the cost of one more
+field. `tcp.stream` now joins the key.
+
+Cross-checked afterwards on the reference capture: **23,531 frames**, which is
+exactly `p2raw`'s count, and `0x0951` × 11 / `0x0954` × 2 / `0x0955` × 3 /
+`0x0956` × 2 / `0x0959` × 2, exactly the census figures. Three independent
+readers, one number.
+
+### `analyze_pcap.py` was the last public tool with no tests
+
+**15 tests**, and the repository's `scanner` CI job already runs them: routing
+offsets, the tallying of requests, errors, success responses and zero-length
+bodies, and the reassembly cases that are the whole point — a frame split
+across segments, several frames in one segment, a retransmission counted once,
+a partial overlap keeping only its new tail, a gap that does not misalign what
+follows, and the port reuse above.
+
+Its output is entirely counts, so a defect in it does not crash. It prints a
+smaller number.
+
 ## v2.10.1 — the frame that did not exist (2026-09-18)
 
 A defect in `p2_scanner.py`, two in `virtual_pxc/`, the repository's first tests

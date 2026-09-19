@@ -269,7 +269,8 @@ def process_p2_frame(frame, src_ip, src_port, dst_ip, dst_port):
         pass
 
 
-def consume_segment(segment_data, src_ip, src_port, dst_ip, dst_port, seq=None):
+def consume_segment(segment_data, src_ip, src_port, dst_ip, dst_port, seq=None,
+                    stream_id=None):
     """Place segment data in the directional stream and pull complete frames.
 
     PLACED, not appended. Appending in arrival order parses a retransmission's
@@ -283,8 +284,20 @@ def consume_segment(segment_data, src_ip, src_port, dst_ip, dst_port, seq=None):
     p2raw can buffer the whole capture and place bytes absolutely. This streams,
     so it carries the next expected offset per half-connection and trims a
     segment that starts behind it.
+
+    `stream_id` is tshark's `tcp.stream`, and it is part of the key because a
+    four-tuple is not one connection. A peer that closes and reconnects from
+    the same ephemeral port produces what tshark labels "[TCP Port numbers
+    reused]", and with relative sequence numbers the new connection restarts
+    near zero while this function is holding a write cursor far past it -- so
+    every byte of it read as a retransmission and was thrown away, silently,
+    counted into the duplicate tally. On one capture in the corpus that is
+    **806 of 3,211 four-tuples**, 1,114 frames and 98,032 bytes. p2raw solves
+    the same problem by splitting generations on a sequence jump; a streaming
+    reader cannot look ahead, but tshark already knows the answer and will say
+    so for the cost of one more field.
     """
-    key = (src_ip, src_port, dst_ip, dst_port)
+    key = (stream_id, src_ip, src_port, dst_ip, dst_port)
     buf = streams[key]
 
     if seq is not None:
@@ -354,6 +367,7 @@ def main():
            "-Y", "(tcp.dstport==5033 or tcp.dstport==5034 or "
                  "tcp.srcport==5033 or tcp.srcport==5034) and tcp.len > 0",
            "-T", "fields",
+           "-e", "tcp.stream",         # a four-tuple can carry more than one
            "-e", "ip.src", "-e", "tcp.srcport",
            "-e", "ip.dst", "-e", "tcp.dstport",
            "-e", "tcp.seq",            # relative; needed to PLACE the segment
@@ -376,18 +390,20 @@ def main():
     n = 0
     for line in lines:
         parts = line.split("\t")
-        if len(parts) < 6 or not parts[5]:
+        if len(parts) < 7 or not parts[6]:
             continue
         try:
-            src_ip = parts[0]
-            src_port = int(parts[1])
-            dst_ip = parts[2]
-            dst_port = int(parts[3])
-            seq = int(parts[4]) if parts[4] else None
-            payload = bytes.fromhex(parts[5].replace(":", ""))
+            stream_id = parts[0] or None
+            src_ip = parts[1]
+            src_port = int(parts[2])
+            dst_ip = parts[3]
+            dst_port = int(parts[4])
+            seq = int(parts[5]) if parts[5] else None
+            payload = bytes.fromhex(parts[6].replace(":", ""))
         except (ValueError, IndexError):
             continue
-        consume_segment(payload, src_ip, src_port, dst_ip, dst_port, seq)
+        consume_segment(payload, src_ip, src_port, dst_ip, dst_port, seq,
+                        stream_id)
         n += 1
 
     print(f"[*] processed {n} segments")
