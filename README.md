@@ -373,6 +373,78 @@ The GUI imports the scanner at runtime, so keep the three `.py` files together. 
 configuration is edited in **File → Edit Site Config** and is applied immediately;
 `site.json` is written only if you choose **Save Config**, and is otherwise optional.
 
+## Virtual PXC (develop without a panel)
+
+[`virtual_pxc/`](virtual_pxc/) is a virtual APOGEE PXC that runs in-process. Point a
+scanner, a bridge, a dissector or your own client at it and it answers like a panel.
+
+```python
+from virtual_pxc import VirtualPxc
+
+panel = VirtualPxc.from_fixtures("fixtures.json")
+panel.start()                     # binds 127.0.0.1 on a free port
+print(panel.host, panel.port)
+...
+panel.stop()
+```
+
+**What makes it worth pointing a client at is that it refuses what a real panel
+refuses.** A fixture that answers everything proves nothing:
+
+- **It enforces the header length.** `msg_type` is `13 + the total bytes of the four
+  routing slots` ([§6.2](PROTOCOL.md)). A frame whose value disagrees with its own slots
+  is **dropped silently** — no error, no reset, just nothing. That failure mode is hard
+  to find in a building and trivial to find here. `0x33` and `0x34` get no special
+  treatment; they are two lengths, not two dialects.
+- **An unimplemented opcode gets `not_found`**, not a synthetic success — otherwise every
+  operation you have not written yet looks like it works.
+- **It can fail on purpose.** `drop_connections()` cuts every live socket;
+  `refuse_connections(n)` accepts and immediately closes the next *n*, which is what a
+  panel that is up but not ready does. A client's reconnect and backoff paths are usually
+  the least-tested code it has.
+
+**Verify it against the document and against real panels:**
+
+```bash
+cd virtual_pxc
+python -m pytest tests/ -q     # 12 framing tests
+python verify.py               # frame invariants, response structure, capability table
+```
+
+`verify.py` compares each response against `reference_shapes.json` — the *structure* of
+real captured panel responses across **70 opcodes and 148 distinct structures**, with
+lengths and contents stripped so it is publishable. It also reports what the virtual
+panel does **not** model (unsolicited keepalives, EBLN replication, COV subscription
+lifecycle, segmentation) rather than passing over it, because a fixture's gaps are where
+a client's bugs hide.
+
+No dependencies beyond the standard library and `pytest`.
+
+## P2 → BACnet bridge
+
+[`bridge/`](bridge/) exposes APOGEE points to any BACnet supervisor — Desigo CC, Niagara,
+EBI, anything that speaks BACnet/IP. Every P2 point becomes a BACnet object; analog reads
+become `analogInput`/`analogValue`, digital become `binaryInput`/`binaryValue`, and the
+panel's `#COM` indicator propagates to `reliability` and the fault status flag so a
+supervisor lights up red the same way Desigo does.
+
+**Read-only by design**, the same posture as the scanner. The BACnet side advertises
+exactly the six services it answers — `readProperty`, `readPropertyMultiple`, `i-Am`,
+`i-Have`, `who-Is`, `who-Has`. `writeProperty` is not among them.
+
+```bash
+cd bridge
+pip install -r requirements.txt          # bacpypes3, and nothing else
+python p2_bridge_launcher.py             # GUI: configure, build a manifest, run
+python p2_bacnet_bridge.py --help        # CLI
+```
+
+**It is a separate application.** `bacpypes3` is declared in `bridge/requirements.txt`
+and never at the repository root, and the scanner does not import the bridge — so cloning
+this repository to use the scanner or the dissector alone installs nothing. The bridge
+imports `p2_scanner` from the root as a library; that is the whole dependency, and
+`bridge/tests/test_symbol_resolution.py` fails the build if any of it moves.
+
 ## Scope & ethics
 
 P2 has **no authentication and no encryption** — the only admission check is a matching
