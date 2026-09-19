@@ -200,6 +200,15 @@ msg_types = Counter()
 next_seq = {}                 # half-connection -> next expected stream offset
 retransmit_bytes = [0]        # duplicate bytes trimmed, for the report
 gap_bytes = [0]               # bytes missing from the capture, for the report
+desync_bytes = [0]            # bytes dropped after an impossible length prefix
+desync_events = [0]           # how many times that happened
+
+# PROTOCOL.md 6.1.1: 13 header bytes plus four NUL slot terminators is 17, and
+# a request adds two opcode bytes for 19. A length prefix below 17 cannot
+# describe a frame, so it is a desynchronised stream rather than a short one --
+# the guard used to admit 12 and hand `process_p2_frame` an empty payload,
+# which counted a header length for a frame that does not exist.
+MIN_FRAME = 17
 unknown_opcode_samples = defaultdict(list)
 opcode_sizes = defaultdict(list)
 opcode_by_port = defaultdict(Counter)  # tcp_port → opcode → count
@@ -327,7 +336,15 @@ def consume_segment(segment_data, src_ip, src_port, dst_ip, dst_port, seq=None,
     buf.extend(segment_data)
     while len(buf) >= 12:
         total_len = struct.unpack(">I", bytes(buf[:4]))[0]
-        if total_len < 12 or total_len > 65536:
+        if total_len < MIN_FRAME or total_len > 65536:
+            # The length prefix is not one: the stream is out of step, and
+            # nothing after it in this buffer can be trusted. Dropping it is
+            # right; dropping it WITHOUT SAYING SO was not. This tool's whole
+            # output is counts, and it already reports the bytes it trims as
+            # duplicates and the bytes missing from the capture. A third hole
+            # that reported nothing is the one a reader cannot account for.
+            desync_bytes[0] += len(buf)
+            desync_events[0] += 1
             buf.clear()
             return
         if len(buf) < total_len:
@@ -411,6 +428,10 @@ def main():
         print(f"[*] {retransmit_bytes[0]} duplicate bytes trimmed "
               f"(retransmissions / overlap), {gap_bytes[0]} bytes missing from "
               f"the capture")
+    if desync_bytes[0]:
+        print(f"[*] {desync_bytes[0]} bytes discarded after "
+              f"{desync_events[0]} impossible length prefix(es) — a "
+              f"desynchronised stream, NOT counted in the tallies below")
     print(f"[*] frames extracted (msg_types): "
           f"{sum(msg_types.values())}\n")
 

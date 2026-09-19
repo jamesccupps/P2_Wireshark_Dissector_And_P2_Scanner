@@ -46,8 +46,9 @@ def clean_state():
                  "decode_errors"):
         getattr(ap, name).clear()
     ap.decode_dump.clear()
-    ap.retransmit_bytes[0] = 0
-    ap.gap_bytes[0] = 0
+    for counter in (ap.retransmit_bytes, ap.gap_bytes, ap.desync_bytes,
+                    ap.desync_events):
+        counter[0] = 0
     yield
 
 
@@ -149,6 +150,46 @@ def test_a_gap_is_counted_and_does_not_misalign_what_follows():
     ap.consume_segment(f, "10.0.0.9", 40000, "10.0.0.1", 5033, 500, "1")
     assert ap.gap_bytes[0] == 500 - 11
     assert ap.opcode_counts[OP_EBLN_PING] == 1      # the whole frame, not two
+
+
+# ───────────────────────────────────────────────────────── desync
+
+def test_an_impossible_length_prefix_is_discarded_and_COUNTED():
+    """Dropping the buffer is right. Dropping it without saying so was not.
+
+    The tool's whole output is counts, and it already reports trimmed
+    duplicates and missing bytes. A third hole that reported nothing is the
+    one a reader cannot account for.
+    """
+    junk = b"\xff\xff\xff\xff" + b"A" * 20
+    feed(junk)
+    assert ap.desync_events[0] == 1
+    assert ap.desync_bytes[0] == len(junk)
+    assert sum(ap.msg_types.values()) == 0
+
+
+def test_a_length_below_the_format_floor_is_not_a_frame():
+    """13 header bytes plus four NUL terminators is 17 (PROTOCOL.md 6.1.1).
+
+    A prefix of 12 used to pass the guard and hand `process_p2_frame` an empty
+    payload, which counted a header length for a frame that cannot exist.
+    """
+    feed(struct.pack(">III", 12, 51, 1) + b"\x00" * 8)
+    assert sum(ap.msg_types.values()) == 0
+    assert ap.desync_events[0] == 1
+
+
+def test_a_valid_frame_after_a_desync_still_parses():
+    """The buffer is cleared, not the stream: the next segment resynchronises.
+
+    Fed at the offset that continues the stream, so this exercises recovery
+    rather than the gap path.
+    """
+    junk = b"\xff\xff\xff\xff" + b"A" * 20
+    feed(junk)
+    feed(frame(), start=1 + len(junk))
+    assert ap.opcode_counts[OP_EBLN_PING] == 1
+    assert ap.gap_bytes[0] == 0
 
 
 # ───────────────────────────────────────────────────────── port reuse

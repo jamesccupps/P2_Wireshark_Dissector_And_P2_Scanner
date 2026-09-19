@@ -31,9 +31,25 @@ exactly `p2raw`'s count, and `0x0951` × 11 / `0x0954` × 2 / `0x0955` × 3 /
 `0x0956` × 2 / `0x0959` × 2, exactly the census figures. Three independent
 readers, one number.
 
+### `analyze_pcap.py`: a third hole that reported nothing
+
+On an impossible length prefix the reader dropped its whole buffer and returned
+**without counting anything**. The tool reports the bytes it trims as duplicates
+and the bytes missing from the capture; a third discard that said nothing is the
+one a reader cannot account for. It is now counted and printed.
+
+The guard that decides "impossible" also moved: it admitted `total_len` 12,
+which was then handed on as a frame with an empty payload and counted a header
+length for something that cannot exist. **13 header bytes plus four NUL slot
+terminators is 17** (§6.1.1), and a request adds two more for 19.
+
+Neither fires on the corpus — the reference capture still reports 23,531
+frames, and the port-reuse capture 125,237 — which is the point. A counter that
+reads zero is evidence; a discard that prints nothing is not.
+
 ### `analyze_pcap.py` was the last public tool with no tests
 
-**15 tests**, and the repository's `scanner` CI job already runs them: routing
+**18 tests**, and the repository's `scanner` CI job already runs them: routing
 offsets, the tallying of requests, errors, success responses and zero-length
 bodies, and the reassembly cases that are the whole point — a frame split
 across segments, several frames in one segment, a retransmission counted once,
