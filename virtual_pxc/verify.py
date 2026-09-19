@@ -131,6 +131,31 @@ def check_frame(panel):
            PASS if slots[1] == "P2BRIDGE" and slots[3] == panel.node else FAIL,
            "%s / %s" % (slots[1], slots[3]))
 
+    # The panel's OWN outbound frames, held to the same rule. They were not
+    # checked here before, and were malformed for as long as they existed:
+    # two direction bytes and a constant msg_type, so a client read slot 0 as
+    # empty and took the node name's first two characters for the opcode.
+    # Nothing noticed, because nothing consumed a push.
+    push = panel._build_push_frame(struct.pack(">H",
+                                               virtual_pxc.OP_DBCHANGE_POINT))
+    p_total, p_mt, _p_seq = struct.unpack(">III", push[:12])
+    p_payload = push[12:]
+    p_slots = [x.decode() for x in p_payload[1:].split(b"\x00")[:4]]
+    p_off = 1 + sum(len(x) + 1 for x in p_slots)
+    report("frame", "panel's own push: total_len self-inclusive",
+           PASS if p_total == len(push) else FAIL,
+           "declared %d, frame %d" % (p_total, len(push)))
+    report("frame", "panel's own push: one direction byte, slot 0 next",
+           PASS if p_payload[0] == 0x00 and p_payload[1] != 0x00 else FAIL,
+           "%s" % p_payload[:2].hex(" "))
+    report("frame", "panel's own push: msg_type == 13 + slot bytes",
+           PASS if p_mt == virtual_pxc.expected_msg_type(p_slots) else FAIL,
+           "got %d, want %d" % (p_mt, virtual_pxc.expected_msg_type(p_slots)))
+    report("frame", "panel's own push: opcode where a client looks",
+           PASS if struct.unpack_from(">H", p_payload, p_off)[0]
+           == virtual_pxc.OP_DBCHANGE_POINT else FAIL,
+           "0x%04X" % struct.unpack_from(">H", p_payload, p_off)[0])
+
     # a wrong header length must be dropped, silently
     bad = raw_ask(panel, 0x33, 0x4640)
     report("frame", "wrong msg_type dropped silently",
@@ -229,9 +254,16 @@ def check_level2(panel):
     for k, v in have.items():
         report("level2", k, v)
 
+    # Unsolicited peer traffic, on demand: push_dbchange() sends an
+    # AP2_DBCHANGE_* notification on the session already open -- the shape
+    # measured on the wire, not the "bare opcode" an earlier reading assumed.
+    report("level2", "Unsolicited peer-initiated notification", PASS,
+           "push_dbchange() emits a DBCHANGE on the open session")
+
     # things the mock genuinely does not do
     report("level2", "EPing cadence / liveness timing", ABSENT,
-           "answers 0x0100 but emits no unsolicited keepalive")
+           "emits no keepalive on its own schedule; a client that waits to be "
+           "pinged waits forever")
     report("level2", "Node-name table: hold, version, replicate, converge", ABSENT,
            "no EBLN replication at all")
     report("level2", "Serve COV subscriptions", PARTIAL,

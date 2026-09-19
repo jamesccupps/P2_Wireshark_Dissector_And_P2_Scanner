@@ -115,6 +115,19 @@ OP_DEVICE_COMMIT       = 0x4224
 OP_DEVICE_INSTALL      = 0x4225
 OP_SCHEDULE_OBJECT     = 0x5003
 
+# Unsolicited AP2_DBCHANGE_* notifications: a peer announcing a database
+# change, sent on the session already open rather than by connecting back.
+# The five observed on the wire, not the whole documented family.
+OP_DBCHANGE_POINT      = 0x0951
+OP_DBCHANGE_TREND      = 0x0954
+OP_DBCHANGE_PPCL       = 0x0955
+OP_DBCHANGE_CONTROLLER = 0x0956
+OP_DBCHANGE_EQS_SCHED  = 0x0959
+DBCHANGE_NOTIFY_OPCODES = frozenset({
+    OP_DBCHANGE_POINT, OP_DBCHANGE_TREND, OP_DBCHANGE_PPCL,
+    OP_DBCHANGE_CONTROLLER, OP_DBCHANGE_EQS_SCHED,
+})
+
 # Errors
 ERR_NOT_FOUND                   = 0x0003
 ERR_INVALID_POINT_NUMBER        = 0x0E12
@@ -375,6 +388,45 @@ class VirtualPxc:
         """
         with self._lock:
             self._refuse_remaining = max(0, int(n))
+
+    # ── Unsolicited peer traffic ───────────────────────────────────────────
+
+    def push_dbchange(self, opcode: int = OP_DBCHANGE_POINT) -> int:
+        """Send an unsolicited `AP2_DBCHANGE_*` notification to every client.
+
+        A peer announcing that its database changed -- a point added, a trend
+        or PPCL program edited, a controller or EQS mode-schedule touched. It
+        arrives **on the session already open**, unlike the COV push, which
+        the panel delivers by connecting back on 5034.
+
+        The shape is measured, not invented: direction byte, four routing
+        slots, the two opcode bytes, and **nothing after**. 48 bytes at the
+        site it was captured from, drawing a bare acknowledgement. It is not a
+        two-byte payload -- no P2 frame that small exists (PROTOCOL.md 6.1.1),
+        and an earlier reading of these as "bare-opcode keepalives" put a
+        predicate into `p2_scanner` that could never once be true.
+
+        Returns the number of clients it reached. Exists so a client's
+        handling of peer-initiated traffic arriving mid-read can be exercised
+        at all, which was ABSENT before.
+        """
+        if opcode not in DBCHANGE_NOTIFY_OPCODES:
+            raise ValueError(
+                "%#06x is not one of the DBCHANGE notifications observed on "
+                "the wire %r -- a fixture that emits an unattested frame "
+                "teaches the wrong wire format"
+                % (opcode, sorted(DBCHANGE_NOTIFY_OPCODES)))
+        frame = self._build_push_frame(struct.pack('>H', opcode))
+        with self._lock:
+            conns = list(self._live_conns)
+        sent = 0
+        for c in conns:
+            try:
+                c.sendall(frame)
+                sent += 1
+            except OSError as e:
+                log.debug("VirtualPxc: DBCHANGE push failed: %s", e)
+        return sent
 
     # ── Client connection handler ──────────────────────────────────────────
 
@@ -1141,20 +1193,7 @@ class VirtualPxc:
         framed push. The supervisor's ACK (if any) is ignored — the panel
         treats this channel as fire-and-forget."""
         host, port = target
-        # Build a complete frame with msg_type=0x33 and our own push-seq
-        with self._lock:
-            self._push_seq = (self._push_seq + 1) & 0xFFFFFFFF
-            push_seq = self._push_seq
-        # Routing: from panel to supervisor (we use supervisor's identity in
-        # slot 1, panel name in slot 3 — opposite of what supervisor-initiated
-        # frames carry).
-        routing = (b'\x00'
-                   + self.bln.encode('ascii') + b'\x00'
-                   + self._default_supervisor_name().encode('ascii') + b'\x00'
-                   + self.bln.encode('ascii') + b'\x00'
-                   + self.node.encode('ascii') + b'\x00')
-        payload = bytes([DIR_REQUEST]) + routing + body
-        frame = _frame(TYPE_DATA, push_seq, payload)
+        frame = self._build_push_frame(body)
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(2.0)
@@ -1163,3 +1202,29 @@ class VirtualPxc:
             sock.close()
         except (OSError, socket.timeout) as e:
             log.debug("VirtualPxc: COV push to %s:%d failed: %s", host, port, e)
+
+    def _build_push_frame(self, body: bytes) -> bytes:
+        """A complete panel-originated frame: routing reversed, msg_type derived.
+
+        Routing is panel -> supervisor, so the supervisor's identity is in slot
+        1 and the panel's name in slot 3 -- the opposite of a
+        supervisor-initiated frame. It goes through `_build_routing` like every
+        other frame here. An earlier edition rolled its own inline, starting it
+        with a NUL and then prepending the direction byte, so every push left
+        with TWO direction bytes: a conforming client read slot 0 as empty,
+        lost the node name, and took its first two characters for the opcode
+        (`NODE1` -> `0x4E4F`).
+
+        `msg_type` is DERIVED, never the module's TYPE_DATA constant. A panel
+        that silently drops an inbound frame whose header length contradicts
+        its own slots cannot be emitting one itself -- it was sending the
+        constant 51 where those slots required 33.
+        """
+        with self._lock:
+            self._push_seq = (self._push_seq + 1) & 0xFFFFFFFF
+            push_seq = self._push_seq
+        slots = (self.bln, self._default_supervisor_name(), self.bln, self.node)
+        payload = (bytes([DIR_REQUEST])
+                   + _build_routing(slots[0], slots[1], slots[3])
+                   + body)
+        return _frame(expected_msg_type(slots), push_seq, payload)
