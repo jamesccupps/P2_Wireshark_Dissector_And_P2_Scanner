@@ -68,6 +68,30 @@ because a fixture that emits an unattested frame teaches the wrong wire format.
 
 Self-verification: **24 PASS, 1 PARTIAL, 3 ABSENT, 0 FAIL** (was 19/1/3/0).
 
+### `p2_scanner.py`: a real unit lost to a placeholder
+
+`looks_like_units()` was fixed earlier for accepting too little. The remaining
+half was **which** candidate to take when a body carries more than one. It took
+the last, and one real body in sixty holds `DEG F` and then, further on, a lone
+`?` — so the unit was thrown away and a placeholder reported.
+
+It now prefers a candidate the embedded catalog recognises and falls back to the
+last otherwise. The fallback is deliberate: `eng_units` is a `TEXT_` field an
+engineer types into, so a site can hold a unit string that ships in no catalog
+and discarding those is the defect from the other direction. **Prefer what is
+known; never drop what is merely unknown.**
+
+Measured over the same sixty real `0x0981` bodies: catalog-recognised units
+**36 → 37**, everything else unchanged — same fifteen empty, same fifty-nine
+values.
+
+Worth recording because a plausible-sounding fix was **rejected** here: the
+strings that look wrong in that field — `OCCUPIED`, `ENTHALPY` — sit in exactly
+the same structural slot as a confirmed `DEG F` (name ×3 each followed by an
+empty TLV, description, units, trailing empty). The panel really does hold them.
+`STAGES`, also suspected, **is in the vendor catalog**. A filter would have
+discarded real panel data.
+
 ### `PROTOCOL.md` §6.1.1: the minimum frame size
 
 The observed range was given as **31 to 1,622 bytes**. True, and misleading:

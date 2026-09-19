@@ -2176,11 +2176,23 @@ class P2Connection:
                 units_candidates.append((pos, L, s.strip()))
 
         # The units TLV, if present, is typically the LAST ASCII TLV in the body
-        # (before trailing binary metadata). Pick the last candidate.
+        # (before trailing binary metadata) -- but "last" is not always right.
+        # One real body in sixty carries `DEG F` and then, further on, a lone
+        # `?`. Both pass the shape test, taking the last one reported `?` and
+        # threw the real unit away.
+        #
+        # So prefer a candidate the embedded catalog recognises, and fall back
+        # to the last otherwise. The fallback matters: `eng_units` is a TEXT_
+        # field an engineer types into, so a site can hold a unit string that
+        # ships in no catalog, and discarding those is the defect this parser
+        # had in the other direction. Prefer what is known; never drop what is
+        # merely unknown.
         units_pos = None
         units_str = ''
         if units_candidates:
-            units_pos, units_L, units_str = units_candidates[-1]
+            catalog = known_unit_strings()
+            known = [c for c in units_candidates if c[2].upper() in catalog]
+            units_pos, units_L, units_str = (known or units_candidates)[-1]
 
         # Description: first ASCII TLV after the last device repetition that isn't units
         description = ''
