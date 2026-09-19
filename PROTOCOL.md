@@ -1639,8 +1639,26 @@ malformed or hostile length prefix. [I] It should equally reject one that is
 too **small**: 13 header bytes plus four NUL terminators is 17, and a request
 adds two opcode bytes for 19, so any `total_len` below that cannot describe a
 valid frame and a reader that subtracts without checking will underflow. No
-frame in the corpus comes close — the observed range is **31 to 1,622 bytes**,
-median 85 — but the floor is a property of the format, not of the traffic. [W]
+frame in the corpus comes close, and the floor is a property of the format
+rather than of the traffic. The observed range is **31 to 1,622 bytes**, median
+85 — but that 31 is **this project's own malformed probe traffic**, not
+something a vendor node emits: those frames carry a hard-coded `msg_type` of
+`0x33` against slots implying 17 to 29, and they are among the 736 exceptions
+§6.2.2 attributes host-by-host to our two research addresses. The smallest
+**well-formed** frame from a supervisor or a panel anywhere in the corpus is
+**41 bytes** — a bare acknowledgement between two short-named peers: `dir`
+`0x01`, four slots, zero body. [W]
+
+There is, in particular, **no bare-opcode frame**. The `AP2_DBCHANGE_*`
+opcodes a peer sends unsolicited (`0x0951`, `0x0954`, `0x0955`, `0x0956`,
+`0x0959` — §9.5) are ordinary requests carrying a **zero-length body**: direction
+byte, four routing slots, the two opcode bytes, and nothing after — 48 bytes
+on the wire at this site, drawing a 46-byte bare acknowledgement. They are not
+a two-byte payload in which the opcode is the whole frame. Such a frame would
+be 14 bytes with no direction byte and no routing slots, which §6.1 does not
+describe, and none exists in 623,164 trusted frames. Nor are these the
+protocol's keepalive; that is `0x4640 EBLN_PING` (§9.6), which carries an
+`eBLN_Node` body. [W]
 
 #### 6.1.2 Annotated hex example
 

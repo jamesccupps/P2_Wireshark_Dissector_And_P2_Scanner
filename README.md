@@ -398,6 +398,10 @@ refuses.** A fixture that answers everything proves nothing:
   treatment; they are two lengths, not two dialects.
 - **An unimplemented opcode gets `not_found`**, not a synthetic success — otherwise every
   operation you have not written yet looks like it works.
+- **It talks first.** `push_dbchange()` sends an unsolicited `AP2_DBCHANGE_*`
+  notification on the already-open session — a peer announcing a database change —
+  in the shape measured on the wire: direction byte, four routing slots, opcode,
+  no body. A client waiting on a reply has to recognise it and carry on.
 - **It can fail on purpose.** `drop_connections()` cuts every live socket;
   `refuse_connections(n)` accepts and immediately closes the next *n*, which is what a
   panel that is up but not ready does. A client's reconnect and backoff paths are usually
@@ -411,7 +415,7 @@ python -m pytest tests/ -q     # 12 framing tests
 python verify.py               # frame invariants, response structure, capability table
 ```
 
-`verify.py` compares each response against `reference_shapes.json` — the *structure* of
+`verify.py` holds the panel's own outbound frames to the same rules as its responses, and compares each response against `reference_shapes.json` — the *structure* of
 real captured panel responses across **70 opcodes and 148 distinct structures**, with
 lengths and contents stripped so it is publishable. It also reports what the virtual
 panel does **not** model (unsolicited keepalives, EBLN replication, COV subscription

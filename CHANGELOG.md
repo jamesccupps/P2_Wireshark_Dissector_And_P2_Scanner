@@ -1,5 +1,83 @@
 # Changelog
 
+## v2.10.1 — the frame that did not exist (2026-09-18)
+
+A defect in `p2_scanner.py`, two in `virtual_pxc/`, the repository's first tests
+for the scanner, and one settled question.
+
+### `p2_scanner.py`: a predicate that could never be true
+
+The scanner carried a set of five opcodes under this comment:
+
+> Bare-opcode session keepalives. Panels emit these as 2-byte payloads with no
+> direction byte and no body — the opcode IS the payload.
+
+**No such frame exists.** Measured against a supervisor-side capture holding
+twenty of them, and confirmed independently with `tshark`'s built-in TCP
+dissector, every one is an **ordinary request**: direction byte, four routing
+slots, the two opcode bytes, and a **zero-length body**. 48 bytes on the wire,
+`msg_type` 46, answered by a 46-byte bare acknowledgement.
+
+```
+00 00 00 30                       total_len  = 48
+00 00 00 2e                       msg_type   = 46 = 13 + 33 slot bytes
+00 50 48 52                       sequence
+00                                dir = request
+<BLN> NUL <supervisor> NUL <BLN> NUL <node> NUL    four routing slots
+09 51                             opcode  — and nothing after it
+```
+
+So `is_bare_ping`, which tested for a two-byte payload, was **never once true**,
+and the frames it was written to name went on being reported as `"unmatched"`.
+Nor are they keepalives: they are `AP2_DBCHANGE_*` notifications — a peer
+announcing that its point, trend, PPCL, controller or EQS database changed. The
+protocol's keepalive is `0x4640 EBLN_PING` (§9.6), which carries a body.
+
+`is_bare_ping` is replaced by `is_dbchange_notify`, which walks the routing
+slots to the opcode the way `msg_type_for` already does, and the discard reason
+`"bare_ping"` becomes `"dbchange_notify"`.
+
+### The scanner had no tests. It does now
+
+`tests/` at the repository root, and a third CI job. The repository's oldest
+and most-used tool was the only one CI never touched, which is how a predicate
+that was never true survived. **16 tests**: framing invariants, `msg_type`
+derivation, the notification predicate and its negative cases, and an
+end-to-end run against the virtual panel.
+
+### `virtual_pxc/`: the fixture was malformed on the way out
+
+Adding an emitter for the notification above meant looking at the one outbound
+path the panel had, and it was wrong three ways:
+
+- **Two direction bytes.** Routing was built inline starting with a NUL, and
+  then the direction byte was prepended. A conforming client read slot 0 as
+  empty, lost the node name, and took its first two characters for the opcode
+  (`NODE1` → `0x4E4F`). This is the phantom-NUL defect `_build_routing`'s
+  docstring says was fixed; `_push_to` rolled its own and never got the fix.
+- **A constant `msg_type`** — the module's own `TYPE_DATA`, marked deprecated
+  in the source. The panel that silently drops an inbound frame for a wrong
+  header length was **emitting 51 where its slots required 33**.
+- Nothing caught it because **nothing consumed a push**.
+
+Every COV notification and every panel-state push was affected. `verify.py` now
+holds the panel's own outbound frames to the same four invariants as its
+responses, and **`push_dbchange()`** sends an unsolicited notification on the
+already-open session — refusing any DBCHANGE opcode never actually observed,
+because a fixture that emits an unattested frame teaches the wrong wire format.
+
+Self-verification: **24 PASS, 1 PARTIAL, 3 ABSENT, 0 FAIL** (was 19/1/3/0).
+
+### `PROTOCOL.md` §6.1.1: the minimum frame size
+
+The observed range was given as **31 to 1,622 bytes**. True, and misleading:
+that 31 is **this project's own malformed probe traffic** — frames carrying a
+hard-coded `msg_type` of `0x33` against slots implying 17 to 29, among the 736
+exceptions §6.2.2 already attributes to our two research addresses. The
+smallest **well-formed** frame from a supervisor or a panel anywhere in 623,164
+trusted frames is **41 bytes**. The section now says so, and states plainly
+that no bare-opcode frame exists.
+
 ## v2.10.0 — a virtual panel, a BACnet bridge, and 9.3% of PPCL (2026-09-18)
 
 ### Two new components: a virtual PXC, and a P2 → BACnet bridge

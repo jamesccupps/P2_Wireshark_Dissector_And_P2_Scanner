@@ -42,6 +42,14 @@ response against `reference_shapes.json`, which records the *structure* of real
 captured panel responses — 70 opcodes, 148 distinct structures. That caught a
 hand-written `0x0981` body that parsed fine and looked nothing like a panel.
 
+**It talks first.** `push_dbchange()` sends an unsolicited `AP2_DBCHANGE_*`
+notification on the session already open -- a peer announcing that its point,
+trend, PPCL, controller or EQS database changed. A client waiting on a reply
+has to recognise it, ignore it, and carry on with the read it was doing; that
+path is easy to write and almost never exercised. The frame is the one
+measured on the wire -- direction byte, four routing slots, opcode, **no body**
+-- and the panel refuses to emit any DBCHANGE opcode never actually observed.
+
 **It can fail on purpose.** `drop_connections()` cuts every live socket;
 `refuse_connections(n)` accepts and immediately closes the next *n*. A client's
 reconnect and backoff paths are usually the least-tested code it has.
@@ -62,7 +70,7 @@ Three groups, and it reports what it does *not* do rather than passing over it:
 | **Response structure** | each opcode against the real-panel structures in `reference_shapes.json` |
 | **Capability table** | the virtual-PXC rows of the project's Level 2 standard, marked PASS / PARTIAL / ABSENT |
 
-Current: **19 PASS, 1 PARTIAL, 3 ABSENT, 0 FAIL.**
+Current: **24 PASS, 1 PARTIAL, 3 ABSENT, 0 FAIL.**
 
 ### `reference_shapes.json`
 
@@ -88,7 +96,7 @@ Stated plainly, because a fixture's gaps are where a client's bugs hide.
 
 | | |
 |---|---|
-| **EPing cadence / liveness** | answers `0x0100` when asked, but emits no unsolicited keepalive. A client that depends on being pinged will not notice here |
+| **EPing cadence / liveness** | answers `0x0100` when asked, and will send a DBCHANGE notification when you call `push_dbchange()`, but nothing is emitted on a schedule of its own. A client that waits to be pinged waits forever |
 | **Node-name table / EBLN replication** | nothing. No versioning, no convergence, no peer discovery |
 | **COV subscriptions** | pushes `0x0274` after a write, but keeps no subscribe/unsubscribe state — you cannot test subscription lifecycle |
 | **Segmentation above 1,514 B** | not implemented, and `[OPEN]` in `PROTOCOL.md` too: never observed on the wire, so there is nothing to model against |
