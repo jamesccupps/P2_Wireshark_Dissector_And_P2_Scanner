@@ -756,6 +756,39 @@ def render_point_value(value: float, info: Optional[Dict]) -> Tuple[str, str]:
 # Global cache for the full TEC point definitions
 _TECPNTS_DB = None
 
+_KNOWN_UNITS_CACHE = None
+
+
+def known_unit_strings() -> frozenset:
+    """Every engineering-unit string the embedded TEC catalog uses, upper-cased.
+
+    Built once. This is the vendor's own vocabulary, so membership is a fact
+    rather than a guess -- which is the point: unit strings are short and
+    irregular (`SQ. FT`, `PCT RH`, `10K HR`, `K OHM`), and any shape heuristic
+    that tries to recognise them from spelling alone gets some of them wrong.
+    """
+    global _KNOWN_UNITS_CACHE
+    if _KNOWN_UNITS_CACHE is None:
+        found = set()
+        try:
+            db = _load_tecpnts_db()
+            for app, tbl in (db or {}).items():
+                if not isinstance(tbl, dict):
+                    continue
+                for key, pt in tbl.items():
+                    if key == "_meta" or not isinstance(pt, dict):
+                        continue
+                    u = (pt.get("units") or pt.get("eng_units") or "").strip()
+                    if u:
+                        found.add(u.upper())
+        except Exception:
+            # A catalog that will not load must not break point parsing; the
+            # shape heuristic below still applies.
+            found = set()
+        _KNOWN_UNITS_CACHE = frozenset(found)
+    return _KNOWN_UNITS_CACHE
+
+
 def _load_tecpnts_db() -> Optional[Dict]:
     """Load the TEC point definitions.
 
@@ -2072,20 +2105,31 @@ class P2Connection:
                 q_idx = p
                 break
 
-        # Find a units TLV. Real engineering units are narrow: short, no internal
-        # multi-word spaces (except known patterns like "DEG F", "IN H20"). Multi-
-        # word strings like "BLR 2 ALM" are descriptions, not units, even when short.
+        # Find a units TLV. Two tests, in order of authority.
         #
-        # Heuristic: a units string is <= 8 chars and either has no spaces OR
-        # starts with "DEG " / "IN " (the only two space-containing unit patterns
-        # we've seen). Also accept single-char units like "%".
+        # 1. The embedded TEC catalog IS the vendor's unit vocabulary, so
+        #    membership settles it. This is what an earlier edition lacked: it
+        #    accepted a space-containing candidate only when it started with
+        #    "DEG " or "IN ", which discarded eleven real unit strings --
+        #    `SQ. FT` (336 catalog occurrences), `PCT RH` (108), `KVA H`,
+        #    `KW H`, `SQ FT`, `10K HR`, `V MA`, `PCT KW`, `K OHM`, `CU FT`,
+        #    `ERR CD`. 522 occurrences, 2.0% of the catalog, dropped silently.
+        #
+        # 2. Failing that, the old shape heuristic, for a unit the catalog does
+        #    not carry: short, and either no space or one of the two prefixes.
+        #    Kept as a fallback rather than removed, because the catalog covers
+        #    what ships and a site can configure a unit string it never saw.
+        #
+        # Multi-word strings like "BLR 2 ALM" are descriptions, not units, and
+        # both tests still reject them.
         def looks_like_units(s: str) -> bool:
             s = s.strip()
             if not s: return False
+            if s.upper() in known_unit_strings(): return True
             if len(s) > 8: return False
             # Single char / no-space units: "%", "MA", "PSI", "CFM", "PPM", etc.
             if ' ' not in s: return True
-            # Space-containing patterns we accept as units
+            # Space-containing patterns the catalog did not supply
             if s.startswith('DEG ') or s.startswith('deg '): return True
             if s.startswith('IN '): return True
             return False
