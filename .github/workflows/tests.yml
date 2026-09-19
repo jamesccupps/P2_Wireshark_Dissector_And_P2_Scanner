@@ -1,10 +1,10 @@
 name: tests
 
-# The two packages are tested separately because they have different
+# The three packages are tested separately because they have different
 # dependencies, and that separation is the point: the scanner and the virtual
-# PXC need nothing installed, and only the bridge pulls bacpypes3. If the
-# virtual-PXC job ever starts needing a requirements file, something has been
-# wired the wrong way round.
+# PXC need nothing installed, and only the bridge pulls bacpypes3. If either
+# dependency-free job ever starts needing a requirements file, something has
+# been wired the wrong way round.
 
 on:
   push:
@@ -33,6 +33,22 @@ jobs:
       - name: Self-verification against PROTOCOL.md and real-panel structure
         working-directory: virtual_pxc
         run: python verify.py
+
+  scanner:
+    name: scanner (no dependencies)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install pytest only
+        run: python -m pip install --upgrade pip pytest
+      - name: Tests
+        run: python -m pytest tests/ -q
 
   bridge:
     name: bridge

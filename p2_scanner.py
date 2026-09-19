@@ -986,11 +986,27 @@ class P2Message:
     # direction-dependent semantic. Prefer MARKER_VALUE_PUSH for new code.
     MARKER_COV = MARKER_VALUE_PUSH
 
-    # Bare-opcode session keepalives (PROTOCOL.md §7.3).
-    # Panels emit these as 2-byte payloads with no direction byte and no
-    # body — the opcode IS the payload. Distinct from request/response
-    # framing; an in-flight read should not pair with these.
-    BARE_PING_OPCODES = frozenset({0x0951, 0x0954, 0x0955, 0x0956, 0x0959})
+    # Unsolicited DBCHANGE notifications: a peer announcing that its
+    # database changed (point, trend, PPCL, controller, EQS mode-schedule).
+    # AP2_DBCHANGE_* in the opcode catalog, PROTOCOL.md §9.5.
+    #
+    # They are ORDINARY REQUESTS. An earlier comment here called them
+    # "bare-opcode session keepalives" emitted as 2-byte payloads with no
+    # direction byte and no routing slots -- that frame does not exist.
+    # Measured against a supervisor-side capture holding twenty of them,
+    # every one is direction byte + four routing slots + opcode + a
+    # ZERO-LENGTH BODY: 48 bytes on the wire, msg_type 46, answered with a
+    # 46-byte bare acknowledgement. The smallest P2 frame anywhere in the
+    # corpus is 46 bytes, so a 14-byte one is not merely unobserved, it is
+    # unattested.
+    #
+    # Nor are these the protocol's keepalive. That is 0x4640 EBLN_PING
+    # (PROTOCOL.md §9.6), which carries an eBLN_Node body.
+    #
+    # The set is the five seen on the wire, not the whole DBCHANGE family;
+    # the rest are documented but unobserved here.
+    DBCHANGE_NOTIFY_OPCODES = frozenset(
+        {0x0951, 0x0954, 0x0955, 0x0956, 0x0959})
 
     def __init__(self, msg_type: int, sequence: int, payload: bytes):
         self.msg_type = msg_type
@@ -1004,14 +1020,32 @@ class P2Message:
         # responses and made the error-handling code in _parse_*_response
         # unreachable (errors looked like timeouts to the caller).
         self.is_response = payload[0] in (0x01, 0x05) if payload else False
-        # Bare-opcode keepalive ping: exactly 2 bytes, opcode in the set
-        # documented in §9.13. Non-matching 2-byte payloads (e.g. an
-        # error reply truncated to direction+code) are NOT bare pings —
-        # the opcode-set test discriminates.
-        self.is_bare_ping = (
-            len(payload) == 2
-            and struct.unpack('>H', payload)[0] in self.BARE_PING_OPCODES
-        ) if payload else False
+        # Peer-initiated DBCHANGE notification. Recognised so that a frame
+        # arriving while a read is in flight is reported for what it is
+        # rather than as a generic "unmatched".
+        self.is_dbchange_notify = self._is_dbchange_notify(payload)
+
+    @classmethod
+    def _is_dbchange_notify(cls, payload: bytes) -> bool:
+        """True for a request carrying one of the DBCHANGE_NOTIFY_OPCODES.
+
+        The opcode is not at a fixed offset -- it follows four NUL-terminated
+        routing slots whose lengths are the peers' names -- so it is reached
+        with the same slot walk `msg_type_for` already does rather than by a
+        second hand-rolled one. A payload that does not frame at all is not a
+        notification; it is a runt, and the caller's generic path should see
+        it.
+        """
+        if not payload or payload[0] != 0x00:      # responses carry no opcode
+            return False
+        try:
+            off = cls.msg_type_for(payload) - 12
+        except ValueError:
+            return False
+        if off + 2 > len(payload):
+            return False
+        opcode = struct.unpack_from('>H', payload, off)[0]
+        return opcode in cls.DBCHANGE_NOTIFY_OPCODES
 
     @staticmethod
     def msg_type_for(payload: bytes) -> int:
@@ -1209,13 +1243,13 @@ class P2Connection:
         # No dialect state. msg_type is computed per frame from that frame's
         # own routing slots (P2Message.msg_type_for).
         # Optional event hook for frames _recv_response chooses not to pair
-        # with the in-flight request — bare-opcode keepalives (§9.13),
-        # out-of-window sequence numbers, async COV pushes on the same
-        # socket, etc. Default is None (silently discard, matching prior
-        # behavior). Callers can attach a hook to surface what's being
-        # dropped:
+        # with the in-flight request -- a peer's DBCHANGE notifications
+        # (PROTOCOL.md §9.5), out-of-window sequence numbers, async COV
+        # pushes on the same socket, etc. Default is None (silently discard,
+        # matching prior behavior). Callers can attach a hook to surface
+        # what's being dropped:
         #     conn.on_discarded_frame = lambda msg, reason: ...
-        # `reason` is one of: "bare_ping", "stale_seq", "unmatched".
+        # `reason` is one of: "dbchange_notify", "stale_seq", "unmatched".
         self.on_discarded_frame: Optional[Callable[[P2Message, str], None]] = None
 
     def connect(self, node_name: str = "node") -> bool:
@@ -1421,11 +1455,11 @@ class P2Connection:
                 # — almost certainly a stale reply for a prior request.
                 self._discard_frame(msg, "stale_seq")
                 continue
-            # Bare-opcode session keepalive — explicitly recognized so the
-            # discard reason is accurate (was previously routed through the
-            # generic "unmatched" path).
-            if msg.is_bare_ping:
-                self._discard_frame(msg, "bare_ping")
+            # A peer's DBCHANGE notification -- named so the discard reason
+            # is accurate rather than a generic "unmatched". The predicate it
+            # replaced tested for a 2-byte payload and so was never true.
+            if msg.is_dbchange_notify:
+                self._discard_frame(msg, "dbchange_notify")
                 continue
             # Any other frame: peer-initiated traffic on the same socket
             # — async COV, alarm report, identity refresh, etc.
@@ -1435,8 +1469,8 @@ class P2Connection:
     def _discard_frame(self, msg: 'P2Message', reason: str) -> None:
         """Route a frame that won't pair with the in-flight request to the
         optional event hook. No-op when no hook is attached. Used to surface
-        bare pings and async pushes that _recv_response would otherwise drop
-        silently."""
+        DBCHANGE notifications and async pushes that _recv_response would
+        otherwise drop silently."""
         hook = getattr(self, 'on_discarded_frame', None)
         if hook is None:
             return
