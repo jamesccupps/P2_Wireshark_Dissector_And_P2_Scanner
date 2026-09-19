@@ -68,6 +68,46 @@ because a fixture that emits an unattested frame teaches the wrong wire format.
 
 Self-verification: **24 PASS, 1 PARTIAL, 3 ABSENT, 0 FAIL** (was 19/1/3/0).
 
+### `p2_scanner.py`: an unknown TEC application invented 61 points
+
+`get_point_table()` ended in an unconditional fallback. Whatever the
+application number, if the catalog did not know it the function returned
+`COMMON_POINTS` — so `get_point_table(1)` and `get_point_table(424242)` each
+answered with the same **61 points**, indistinguishable from real catalog data.
+
+The embedded catalog covers **1,070 applications numbered 20–6797**. Any TEC
+running something outside that set got a plausible point list belonging to no
+device. Downstream, the bridge's manifest builder typed **all 61 as analog
+BACnet objects**, because the rich metadata that would have said otherwise does
+not exist for an application the catalog has never heard of — so a supervisor
+would have been pointed at 61 objects per device that read as nothing.
+
+The comment above those tables has always said they are used *"ONLY when the
+full catalog cannot be loaded at all"*, and the docstring called that path
+*"dead for normal installs"*. It was neither. An unknown application now
+returns an **empty table**, and the hardcoded tables serve applications
+2020–2027 and only when no catalog is reachable. A caller that gets nothing
+logs a skip; a caller that gets a plausible list builds on it.
+
+Found by the mechanical mapping diff below, not by reading the function.
+
+### The BACnet mapping cross-check (`AUDIT_PLAN` §14 step 4)
+
+The bridge's point-type map and the vendor's own, diffed rather than read:
+
+| | |
+|---|---|
+| the bridge | `P2_TYPE_TO_BACNET`, **4 entries** — analogInput, analogValue, binaryInput, binaryValue |
+| the vendor | `BAC_Point_Base`, **9 arms** tagged with the BACnet object-type enumeration: AI 0, AO 1, AV 2, BI 3, BO 4, BV 5, **MI 13, MO 14, MV 19** |
+
+Five P2 point types carry more than two states — `LOOAP` and `LOOAL`
+(OFF/ON/**AUTO**), `LFSSL` and `LFSSP` (STOP/SLOW/FAST), and `LENUM` (six) —
+and the vendor ships a typed BACnet add form for every one. **Multi-state
+appears nowhere in `bridge/`.** Measured across all 1,070 catalogued
+applications and 181,170 points, none of those five types occurs in a TEC
+application table, so nothing is lost today; the gap is real and currently
+unexercised, which is the honest way to state it.
+
 ### `p2_scanner.py`: a real unit lost to a placeholder
 
 `looks_like_units()` was fixed earlier for accepting too little. The remaining

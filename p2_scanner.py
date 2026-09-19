@@ -366,6 +366,10 @@ def load_config(filepath: str) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 # TEC APPLICATION POINT DEFINITIONS — LEGACY HARDCODED FALLBACK
 # ═══════════════════════════════════════════════════════════════════════════════
+# The applications the hardcoded tables below can actually describe. Outside
+# this set they describe nothing, and `get_point_table` says so rather than
+# answering with COMMON_POINTS.
+_HARDCODED_FALLBACK_APPS = frozenset(range(2020, 2028))
 # These tables (COMMON_POINTS / HEATING_POINTS / REHEAT_POINTS / HW_VALVE_POINTS
 # / FAN_POINTS / SUPPLY_TEMP_POINT) are the **legacy fallback** point catalog,
 # used by `get_point_table` ONLY when the full catalog cannot be loaded at all.
@@ -510,8 +514,18 @@ def get_point_table(application: int) -> Dict[int, tuple]:
     1024 apps — PTYPE / slope / intercept / state labels / per-app _meta).
     Falls back to legacy tecpnts.json (name/units/dtype tuples).
     Falls back to the hardcoded COMMON_POINTS / HEATING_POINTS / ... tables
-    above for apps 2020-2027 only if neither JSON catalog is reachable; that
-    path is dead for normal installs (the data package always ships).
+    above for apps 2020-2027, and ONLY when no catalog is reachable at all —
+    which is what the comment above those tables has always said they are for.
+
+    **An unknown application returns an empty table.** It used to return
+    COMMON_POINTS, unconditionally, for any number at all: `get_point_table(1)`
+    and `get_point_table(424242)` each answered with the same 61 points. The
+    embedded catalog covers 1,070 applications numbered 20–6797, so every TEC
+    running anything outside that set got a plausible-looking point list that
+    belongs to no device — and nothing downstream could tell the difference. The
+    bridge's manifest builder typed all 61 as analog BACnet objects, because the
+    rich metadata that would have said otherwise does not exist for an
+    application the catalog has never heard of.
 
     Return format: {addr: (name, desc, units, read_only)} — same tuple shape
     as before for backwards compatibility with all call sites.
@@ -550,7 +564,15 @@ def get_point_table(application: int) -> Dict[int, tuple]:
             points[addr] = (name, name, units, ro)
         return OrderedDict(sorted(points.items()))
 
-    # Fallback to hardcoded tables
+    # Hardcoded fallback — a catalog-of-last-resort, not a default answer.
+    #
+    # Two conditions, and the code used to test neither. An application the
+    # catalog knows nothing about gets an EMPTY table, because inventing 61
+    # points for it is worse than saying nothing: a caller that gets nothing
+    # logs a skip, and a caller that gets a plausible list builds on it.
+    if _TECPNTS_DB or application not in _HARDCODED_FALLBACK_APPS:
+        return OrderedDict()
+
     points = dict(COMMON_POINTS)
 
     if application == 2020:
