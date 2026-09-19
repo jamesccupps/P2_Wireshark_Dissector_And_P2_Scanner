@@ -19,6 +19,29 @@ equipment:
 The dissector is built and validated from wire captures; the opcode names are the
 protocol's AP2 function-code vocabulary.
 
+> **v2.10.0 — a virtual panel you can develop against, and a BACnet bridge.**
+> [`virtual_pxc/`](virtual_pxc/) is a virtual APOGEE panel that **refuses what a
+> real panel refuses**: it validates `msg_type` as `13 + routing-slot bytes` and
+> **drops a mismatch silently**, answers an unimplemented opcode with
+> `not_found` rather than a synthetic success, and can be told to drop or refuse
+> connections so a client's reconnect path actually runs. It ships the
+> *structure* of real captured panel responses across **70 opcodes** — lengths
+> and contents stripped, so it is publishable — and `verify.py` checks itself
+> against `PROTOCOL.md` and that reference, reporting what it does **not** model
+> rather than passing over it. [`bridge/`](bridge/) is a read-only P2 → BACnet/IP
+> bridge; `bacpypes3` lives in `bridge/requirements.txt` and never at the
+> repository root, so cloning this repo for the scanner alone still installs
+> nothing. First CI too: 81 tests, Python 3.10–3.13.
+>
+> **Also in 2.10.0 — `PROTOCOL.md` §14 was wrong about 9.3% of PPCL.** It said
+> twenty-nine statements account for all 4,731 statement lines. They account for
+> 4,291; the other **440 are assignments**, `<point> = <expression>`, whose
+> leading token is a point name and not a keyword. A parser matching keywords
+> against a line's first token works on ten lines in eleven and then fails on
+> ordinary arithmetic. `OIP`'s `[OPEN]` closes, `LN` is gone, and §15.3.1's
+> SSTO round-trip warning is re-pointed at the field that actually holds the
+> panel's learned state. Full account in the [changelog](CHANGELOG.md).
+>
 > **v2.9.1 — `EQUAL` and `LESS` are reserved words after all.** v2.9.0
 > removed them from `PROTOCOL.md` §14.3's PPCL reserved-word set, reasoning that
 > they were a two-column vendor table's *description* column read as tokens.
@@ -34,26 +57,6 @@ protocol's AP2 function-code vocabulary.
 > keyword**, `TOTAL` a **function**, `LOW` and `FAILED` **status values**. A
 > client resolving those as resident points reads the statements wrong.
 > Full account in the [changelog](CHANGELOG.md).
->
-> **v2.9.0 — the correctness pass.** Nine defects in shipped code, and a
-> corpus recount. **If you are running 2.8.2, four of them are producing wrong
-> output on your captures right now**: the dissector's Info column warned on
-> every correct request frame and stayed silent on the one header-length error
-> it exists to catch; a `0x00`-typed string TLV made a COV point report
-> `9.24856986e-44` instead of `72.25`, or decode no points at all;
-> `analyze_pcap.py` counted every retransmitted frame twice, inflating every
-> number it printed; and it reported 558 catalogued opcodes as unknown. Full
-> account in the [changelog](CHANGELOG.md).
->
-> **Also in 2.9.0: the `u32` at frame offset 4 is a header length, not a message class.** It is `13 + the total bytes of the four routing
-> slots`, so it is a sum of node-name lengths and differs from site to site —
-> **compute it; never choose it**. Releases up to v2.8.2 described it as a class
-> taking six values in legacy/modern pairs chosen by a panel's firmware
-> generation, and told you to fingerprint a panel to pick one. That model is
-> withdrawn: `PROTOCOL.md` §6.2 has the field, §6.6 the withdrawal, §6.2.5 what
-> survives. The dialect probe and its cache are gone from the scanner, and every
-> connect is now the fast path.
->
 >
 > Earlier releases are in the [changelog](CHANGELOG.md).
 

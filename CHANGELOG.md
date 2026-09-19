@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v2.10.0 — a virtual panel, a BACnet bridge, and 9.3% of PPCL (2026-09-18)
 
 ### Two new components: a virtual PXC, and a P2 → BACnet bridge
 
