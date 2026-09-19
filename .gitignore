@@ -6,6 +6,15 @@ site.json
 # Local point catalog override
 tecpoints.json
 
+# Bridge runtime files. `manifest.json` is generated against a live site and
+# carries real node names, device names and point names -- the same reason
+# site.json is ignored above. The `.example` files beside them are the
+# templates and ARE tracked.
+bridge/manifest.json
+bridge/bridge_config.json
+bridge/site.json
+*.log
+
 # Captures — may contain live site traffic
 *.pcap
 *.pcapng

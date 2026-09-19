@@ -2,13 +2,19 @@
 
 Tools and a technical reference for **P2 ("Protocol II")**, the Siemens APOGEE
 building-automation protocol over TCP — for owner-operators working with their own legacy
-equipment. This repository contains three things:
+equipment:
 
 - **[`PROTOCOL.md`](PROTOCOL.md)** — a wire-level technical reference for the protocol.
 - **`p2.lua`** — a Wireshark dissector that decodes P2 on the wire (passive).
 - **`p2_gui.py` / `p2_scanner.py`** — a scanner that reads from panels (active; see the
   *P2 Scanner* and *Scope & ethics* sections below), with `firmware_registry.py` (shared
   panel build-tag cache) and `analyze_pcap.py` (offline opcode/error census over a capture).
+- **[`virtual_pxc/`](virtual_pxc/)** — a virtual PXC panel to develop and test a P2 client
+  against, which **enforces the rules a real panel enforces** rather than answering
+  anything. No hardware needed.
+- **[`bridge/`](bridge/)** — a read-only P2 → BACnet/IP bridge, exposing APOGEE points to
+  any BACnet supervisor. A separate application with its own dependency; the scanner does
+  not need it, and cloning this repository for the scanner alone installs nothing.
 
 The dissector is built and validated from wire captures; the opcode names are the
 protocol's AP2 function-code vocabulary.

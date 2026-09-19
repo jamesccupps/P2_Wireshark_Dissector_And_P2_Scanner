@@ -1,0 +1,13 @@
+# BACnet protocol stack. Pinned to a tested range — pre-1.0 releases
+# can include breaking API changes. Tested working range:
+#   0.0.100 to 0.0.115
+# If you hit AttributeError on Application.from_object_list or import
+# errors from bacpypes3.local.device, your installed version is too old.
+# Run: pip install --upgrade --force-reinstall "bacpypes3>=0.0.100,<0.1"
+bacpypes3>=0.0.100,<0.1
+
+# Optional — improves the GUI's "Bind interface" dropdown by showing
+# adapter names (e.g. "Ethernet (10.0.0.5)") instead of bare IPs.
+# Uncomment or install separately:
+#   pip install psutil
+# psutil>=5.9

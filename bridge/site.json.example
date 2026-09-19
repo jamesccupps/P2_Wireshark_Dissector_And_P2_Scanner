@@ -1,0 +1,13 @@
+{
+  "_comment": "Same format as the P2 Scanner. You can share the file. Run `python p2_scanner.py --cold-discover --range YOUR_SUBNET --save site.json` to populate this automatically.",
+  "p2_network": "MYBLN",
+  "p2_site": "SITE",
+  "scanner_name": "P2BRIDGE|5034",
+  "known_nodes": {
+    "NODE1": "192.0.2.10",
+    "NODE2": "192.0.2.11"
+  },
+  "_comment_known_builds": "Firmware build tag per host IP. Auto-populated when the scanner reads 0x010C SystemInfo, so a panel already identified does not need a fresh read to name its firmware. Safe to leave empty; populates on its own.",
+  "known_builds": {
+  }
+}

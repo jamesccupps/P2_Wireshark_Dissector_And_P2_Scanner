@@ -1,0 +1,35 @@
+{
+  "_comment_identity": "BACnet device identity. Pick a device instance number that's unique on your BACnet network. Vendor identifier 999 is the test/example range; if you publish your bridge to a real site, register a vendor ID with ASHRAE.",
+  "bacnet_device_instance": 599001,
+  "bacnet_device_name": "P2-Bridge",
+  "bacnet_device_description": "P2-to-BACnet Bridge for APOGEE PXC controllers",
+  "bacnet_vendor_identifier": 999,
+  "bacnet_vendor_name": "P2 Bridge Project",
+  "bacnet_model_name": "p2-bacnet-bridge",
+  "_comment_versioning": "These two fields default to the bridge's __version__ (auto-derived from p2_bridge/__init__.py) when omitted. Override here if your site needs different BACnet-advertised strings; otherwise leave them off and they'll track the bridge version automatically.",
+
+  "_comment_address": "BACnet network binding. Use the form IP/PREFIX:PORT. The IP must be a local interface IP on the host running the bridge. The prefix sets the broadcast subnet — typical BACnet/IP deployments use /24. Default port is 47808 (0xBAC0). Replace the example below with your real bind address.",
+  "bacnet_address": "192.168.1.50/24:47808",
+
+  "_comment_instance_ids": "Instance ID range for objects representing P2 points. Numbers below this are reserved for the bridge's own objects (device, network port). 1024 leaves a comfortable runway.",
+  "instance_id_start": 1024,
+
+  "_comment_polling": "How often to read each point. Analog points typically need slower polling than digital alarms. With many points per panel the actual cycle time may exceed these intervals — the scheduler reads the most-overdue point first. Defaults match p2_bridge/config.py; raise default_poll_interval_s on fleets >500 points per panel.",
+  "default_poll_interval_s": 60,
+  "digital_poll_interval_s": 30,
+  "inter_read_delay_s": 0.05,
+  "poll_jitter_s": 5.0,
+
+  "_comment_panel_enumerate": "How often to bulk-enumerate panel-internal points. The Points section of a PXC is a separate namespace from FLN devices and reads in bulk via opcode 0x0981. One enumerate covers every panel point on a node in 10-20 seconds.",
+  "panel_enumerate_interval_s": 60,
+
+  "_comment_reconnect": "Exponential backoff for failed P2 connections. Capped to avoid hammering an offline panel.",
+  "reconnect_backoff_initial_s": 5.0,
+  "reconnect_backoff_max_s": 300.0,
+
+  "_comment_logging": "Set log_level to DEBUG for protocol-level detail. log_file is optional; set to null to log only to stderr. log_max_bytes / log_backup_count bound disk use via RotatingFileHandler — default is 10 MB × 5 generations = ~50 MB cap.",
+  "log_level": "INFO",
+  "log_file": "p2_bacnet_bridge.log",
+  "log_max_bytes": 10485760,
+  "log_backup_count": 5
+}

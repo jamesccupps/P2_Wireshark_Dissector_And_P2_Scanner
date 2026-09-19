@@ -1,0 +1,11 @@
+# Generated at a live install and carrying real node names and addresses --
+# never commit these. The `.example` files beside them are the templates.
+site.json
+bridge_config.json
+manifest.json
+
+# Runtime
+*.log
+__pycache__/
+*.py[cod]
+.pytest_cache/

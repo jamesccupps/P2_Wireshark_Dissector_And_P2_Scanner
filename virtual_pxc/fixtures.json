@@ -1,0 +1,255 @@
+{
+  "_comment": "Generic device catalog for the mock PXC. Three TEC apps spanning VAV-cooling-only, VAV-reheat, and FCU patterns. Point values and labels are placeholders \u2014 no real-site data. The mock initializes the value field on each point at startup; clients writing to a point update the value here.",
+  "panel": {
+    "name": "NODE1",
+    "bln": "MYBLN",
+    "site": "BUILDING1",
+    "firmware_build": "PME1252",
+    "hardware_platform": "PXME V2.8.10 APOGEE",
+    "build_date": "Oct 28 2013 12:31:01"
+  },
+  "devices": [
+    {
+      "name": "VAV001",
+      "description": "Conference Room A",
+      "application": 2020,
+      "_app_descr": "VAV Cooling Only",
+      "points": {
+        "APPLICATION": {
+          "value": 2020.0,
+          "units": "",
+          "kind": "analog_ro"
+        },
+        "ROOM TEMP": {
+          "value": 72.5,
+          "units": "DEG F",
+          "kind": "analog_ro"
+        },
+        "CTL TEMP": {
+          "value": 72.0,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "DAY CLG STPT": {
+          "value": 74.0,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "NGT CLG STPT": {
+          "value": 82.0,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "DAY HTG STPT": {
+          "value": 70.0,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "NGT HTG STPT": {
+          "value": 60.0,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "CLG FLOW MIN": {
+          "value": 50.0,
+          "units": "CFM",
+          "kind": "analog_rw"
+        },
+        "CLG FLOW MAX": {
+          "value": 200.0,
+          "units": "CFM",
+          "kind": "analog_rw"
+        },
+        "DMPR POS": {
+          "value": 35.0,
+          "units": "%",
+          "kind": "analog_ro"
+        },
+        "HEAT.COOL": {
+          "value": 0.0,
+          "units": "",
+          "kind": "digital_rw",
+          "on_label": "HEAT",
+          "off_label": "COOL"
+        },
+        "DAY.NGT": {
+          "value": 1.0,
+          "units": "",
+          "kind": "digital_rw",
+          "on_label": "DAY",
+          "off_label": "NGT"
+        },
+        "STPT DIAL": {
+          "value": 0.0,
+          "units": "",
+          "kind": "digital_rw",
+          "on_label": "ON",
+          "off_label": "OFF"
+        }
+      }
+    },
+    {
+      "name": "VAV002",
+      "description": "Office 204",
+      "application": 2027,
+      "_app_descr": "VAV Parallel Fan Powered with Hot Water Reheat",
+      "points": {
+        "APPLICATION": {
+          "value": 2027.0,
+          "units": "",
+          "kind": "analog_ro"
+        },
+        "ROOM TEMP": {
+          "value": 71.8,
+          "units": "DEG F",
+          "kind": "analog_ro"
+        },
+        "CTL TEMP": {
+          "value": 71.5,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "DAY CLG STPT": {
+          "value": 74.0,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "DAY HTG STPT": {
+          "value": 70.0,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "HW VLV POS": {
+          "value": 0.0,
+          "units": "%",
+          "kind": "analog_ro"
+        },
+        "FAN": {
+          "value": 1.0,
+          "units": "",
+          "kind": "digital_rw",
+          "on_label": "ON",
+          "off_label": "OFF"
+        },
+        "HEAT.COOL": {
+          "value": 0.0,
+          "units": "",
+          "kind": "digital_rw",
+          "on_label": "HEAT",
+          "off_label": "COOL"
+        },
+        "DAY.NGT": {
+          "value": 1.0,
+          "units": "",
+          "kind": "digital_rw",
+          "on_label": "DAY",
+          "off_label": "NGT"
+        }
+      }
+    },
+    {
+      "name": "FCU001",
+      "description": "Lab Suite B",
+      "application": 2308,
+      "_app_descr": "VAV w/CHW, HW, Econ Cycle, Static Press CTL",
+      "points": {
+        "APPLICATION": {
+          "value": 2308.0,
+          "units": "",
+          "kind": "analog_ro"
+        },
+        "CTL TEMP": {
+          "value": 73.0,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "DAY CLG STPT": {
+          "value": 75.0,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "DAY HTG STPT": {
+          "value": 68.0,
+          "units": "DEG F",
+          "kind": "analog_rw"
+        },
+        "OAT": {
+          "value": 65.0,
+          "units": "DEG F",
+          "kind": "analog_ro"
+        },
+        "ECON DMPR": {
+          "value": 50.0,
+          "units": "%",
+          "kind": "analog_ro"
+        },
+        "DAY.NGT": {
+          "value": 1.0,
+          "units": "",
+          "kind": "digital_rw",
+          "on_label": "DAY",
+          "off_label": "NGT"
+        }
+      }
+    }
+  ],
+  "_syst_objects": {
+    "_comment": "Hierarchical SYST objects readable via 0x0294 / 0x5003. Path is dot-separated. Property names map to (value, units). All paths are synthetic; real site point names never appear in this fixture.",
+    "BUILDING1.AHU01.ZN": {
+      "MODE": {
+        "value": 1.0,
+        "units": ""
+      },
+      "STATE": {
+        "value": 0.0,
+        "units": ""
+      }
+    },
+    "BUILDING1.FLR01.WING.ROOM.SCH": {
+      "_kind": "schedule",
+      "DESCR": "Conference Room Schedule",
+      "CURRENT_STATE": {
+        "value": 1.0,
+        "units": ""
+      }
+    }
+  },
+  "panel_points": {
+    "_comment": "Panel-internal points: PPCL working variables, virtual points and global analogs. Reachable only via 0x0981, never via 0x0986 -- which is why a mock needs that opcode to exercise a bridge at all.",
+    "OA.TEMP": {
+      "value": 41.6,
+      "units": "DEG F",
+      "description": "Outside air temperature"
+    },
+    "OA.HUMIDITY": {
+      "value": 63.0,
+      "units": "PCT RH",
+      "description": "Outside air humidity"
+    },
+    "BLR.ENABLE": {
+      "value": 1.0,
+      "units": "",
+      "description": "Boiler plant enable"
+    },
+    "CHW.SUPPLY": {
+      "value": 44.2,
+      "units": "DEG F",
+      "description": "Chilled water supply temp"
+    },
+    "PPCL.KOUNT": {
+      "value": 17.0,
+      "units": "",
+      "description": "PPCL working variable"
+    },
+    "SYS.RUNHOURS": {
+      "value": 9412.0,
+      "units": "HRS",
+      "description": "System run hours"
+    },
+    "ZZ.TITLE": {
+      "value": null,
+      "units": "",
+      "description": "Label-only panel entry"
+    }
+  }
+}

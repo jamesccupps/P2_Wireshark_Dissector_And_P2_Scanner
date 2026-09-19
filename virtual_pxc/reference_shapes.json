@@ -1,0 +1,948 @@
+{
+ "_comment": "Structure of real APOGEE PXC responses, by opcode, for verifying an implementation. 'T' is a TLV, '<>' a run of non-TLV bytes. Lengths and contents are deliberately absent: a TLV length is a name's length, and this is derived from one site's captures.",
+ "_generated_by": "gen_reference_shapes.py",
+ "opcodes": {
+  "0x0050": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "T <> T T",
+     "bodies": 60
+    }
+   ]
+  },
+  "0x0100": {
+   "bodies": 1,
+   "structures": [
+    {
+     "skeleton": "T T T <> T T T <> T <> T <> T <> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x010C": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "T T T <> T T T <> T <> T <> T <> T <>",
+     "bodies": 53
+    },
+    {
+     "skeleton": "T T T <> T <> T T T <> T <> T <> T <> T <>",
+     "bodies": 4
+    },
+    {
+     "skeleton": "T T T <> T T T <> T <> T <> T T <>",
+     "bodies": 3
+    }
+   ]
+  },
+  "0x0220": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <>",
+     "bodies": 53
+    },
+    {
+     "skeleton": "<> T T T T T <> T T T <> T <> T <>",
+     "bodies": 3
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T",
+     "bodies": 2
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x0240": {
+   "bodies": 30,
+   "structures": [
+    {
+     "skeleton": "<> T T",
+     "bodies": 30
+    }
+   ]
+  },
+  "0x0241": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 60
+    }
+   ]
+  },
+  "0x0244": {
+   "bodies": 3,
+   "structures": [
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 3
+    }
+   ]
+  },
+  "0x0245": {
+   "bodies": 3,
+   "structures": [
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 3
+    }
+   ]
+  },
+  "0x0246": {
+   "bodies": 3,
+   "structures": [
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 3
+    }
+   ]
+  },
+  "0x0247": {
+   "bodies": 3,
+   "structures": [
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 3
+    }
+   ]
+  },
+  "0x0263": {
+   "bodies": 6,
+   "structures": [
+    {
+     "skeleton": "<> T T",
+     "bodies": 6
+    }
+   ]
+  },
+  "0x0271": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T T T <> T <> T",
+     "bodies": 21
+    },
+    {
+     "skeleton": "<> T T <> T T T <> T <>",
+     "bodies": 9
+    },
+    {
+     "skeleton": "<> T T <> T T T <>",
+     "bodies": 7
+    },
+    {
+     "skeleton": "<> T T <> T T T <> T <> T <> T",
+     "bodies": 7
+    },
+    {
+     "skeleton": "<> T T <> T T T <> T <> T <>",
+     "bodies": 6
+    },
+    {
+     "skeleton": "T T T <> T T T <> T <> T <>",
+     "bodies": 3
+    },
+    {
+     "skeleton": "<> T T <> T T T <> T <> T <> T <>",
+     "bodies": 3
+    },
+    {
+     "skeleton": "<> T T <> T T T <> T <> T <> T <> T <>",
+     "bodies": 2
+    },
+    {
+     "skeleton": "<> T T <> T T T <> T",
+     "bodies": 1
+    },
+    {
+     "skeleton": "T T T <> T T T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x0291": {
+   "bodies": 14,
+   "structures": [
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 14
+    }
+   ]
+  },
+  "0x0294": {
+   "bodies": 52,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <>",
+     "bodies": 12
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <>",
+     "bodies": 12
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T",
+     "bodies": 10
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T",
+     "bodies": 6
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <>",
+     "bodies": 6
+    },
+    {
+     "skeleton": "<> T T T T T <> T T T <> T <>",
+     "bodies": 4
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <>",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x0295": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 10
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 9
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 7
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <>",
+     "bodies": 6
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 6
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 4
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 2
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 2
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <>",
+     "bodies": 2
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 2
+    },
+    {
+     "skeleton": "<> T T T T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T T T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T T T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T T T T <> T T T <> T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x02A8": {
+   "bodies": 8,
+   "structures": [
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 8
+    }
+   ]
+  },
+  "0x040A": {
+   "bodies": 28,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <> T",
+     "bodies": 21
+    },
+    {
+     "skeleton": "<> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T",
+     "bodies": 7
+    }
+   ]
+  },
+  "0x0509": {
+   "bodies": 6,
+   "structures": [
+    {
+     "skeleton": "<> T T",
+     "bodies": 6
+    }
+   ]
+  },
+  "0x0541": {
+   "bodies": 2,
+   "structures": [
+    {
+     "skeleton": "<> T <> T",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x0606": {
+   "bodies": 19,
+   "structures": [
+    {
+     "skeleton": "<>",
+     "bodies": 19
+    }
+   ]
+  },
+  "0x0961": {
+   "bodies": 6,
+   "structures": [
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 6
+    }
+   ]
+  },
+  "0x0964": {
+   "bodies": 12,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T <>",
+     "bodies": 12
+    }
+   ]
+  },
+  "0x0965": {
+   "bodies": 3,
+   "structures": [
+    {
+     "skeleton": "<> T <>",
+     "bodies": 3
+    }
+   ]
+  },
+  "0x0967": {
+   "bodies": 2,
+   "structures": [
+    {
+     "skeleton": "<> T <>",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x0969": {
+   "bodies": 10,
+   "structures": [
+    {
+     "skeleton": "<> T <>",
+     "bodies": 10
+    }
+   ]
+  },
+  "0x0971": {
+   "bodies": 13,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <>",
+     "bodies": 6
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <>",
+     "bodies": 4
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T",
+     "bodies": 2
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x0974": {
+   "bodies": 7,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T <>",
+     "bodies": 6
+    },
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x0975": {
+   "bodies": 10,
+   "structures": [
+    {
+     "skeleton": "<> T T T <> T <>",
+     "bodies": 7
+    },
+    {
+     "skeleton": "<> T T T <>",
+     "bodies": 3
+    }
+   ]
+  },
+  "0x0976": {
+   "bodies": 11,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <> T T <> T <>",
+     "bodies": 11
+    }
+   ]
+  },
+  "0x0977": {
+   "bodies": 2,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <> T <> T <>",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x0979": {
+   "bodies": 10,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <>",
+     "bodies": 10
+    }
+   ]
+  },
+  "0x097C": {
+   "bodies": 4,
+   "structures": [
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 2
+    },
+    {
+     "skeleton": "<> T <> T <>",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x097D": {
+   "bodies": 4,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <> T <>",
+     "bodies": 4
+    }
+   ]
+  },
+  "0x097E": {
+   "bodies": 4,
+   "structures": [
+    {
+     "skeleton": "<> T <>",
+     "bodies": 4
+    }
+   ]
+  },
+  "0x097F": {
+   "bodies": 4,
+   "structures": [
+    {
+     "skeleton": "<> T <>",
+     "bodies": 4
+    }
+   ]
+  },
+  "0x0981": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T",
+     "bodies": 24
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <>",
+     "bodies": 9
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T",
+     "bodies": 6
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <>",
+     "bodies": 6
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <>",
+     "bodies": 4
+    },
+    {
+     "skeleton": "<> T T T T T <> T T T <>",
+     "bodies": 4
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T <> T <>",
+     "bodies": 4
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <>",
+     "bodies": 3
+    }
+   ]
+  },
+  "0x0982": {
+   "bodies": 8,
+   "structures": [
+    {
+     "skeleton": "<> T T T T T <> T <> T <>",
+     "bodies": 6
+    },
+    {
+     "skeleton": "<> T T T T T <> T <> T <> T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T T T T <> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x0983": {
+   "bodies": 8,
+   "structures": [
+    {
+     "skeleton": "<> T T T T T <> T <> T <> T <> T <> T <>",
+     "bodies": 3
+    },
+    {
+     "skeleton": "<> T T T T T <> T <> T <> T <> T <>",
+     "bodies": 3
+    },
+    {
+     "skeleton": "<> T T T T T <> T <> T <> T <> T <> T T <>",
+     "bodies": 1
+    },
+    {
+     "skeleton": "<> T T T T T <> T <> T <> T T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x0984": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T <>",
+     "bodies": 60
+    }
+   ]
+  },
+  "0x0985": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T T T <> T <>",
+     "bodies": 55
+    },
+    {
+     "skeleton": "<> T T T <> T",
+     "bodies": 5
+    }
+   ]
+  },
+  "0x0986": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <> T T <>",
+     "bodies": 31
+    },
+    {
+     "skeleton": "<> T <> T <> T T <> T <>",
+     "bodies": 27
+    },
+    {
+     "skeleton": "<> T <> T <> T T <> T T <>",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x0987": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <> T <> T <> T <>",
+     "bodies": 42
+    },
+    {
+     "skeleton": "<> T <> T <> T <> T T <>",
+     "bodies": 13
+    },
+    {
+     "skeleton": "<> T <> T <> T <> T",
+     "bodies": 3
+    },
+    {
+     "skeleton": "<> T <> T <> T <> T <>",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x0988": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T <> T T <>",
+     "bodies": 35
+    },
+    {
+     "skeleton": "<> T <> T T <> T <>",
+     "bodies": 25
+    }
+   ]
+  },
+  "0x0989": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <>",
+     "bodies": 60
+    }
+   ]
+  },
+  "0x098C": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <>",
+     "bodies": 60
+    }
+   ]
+  },
+  "0x098D": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <> T <>",
+     "bodies": 60
+    }
+   ]
+  },
+  "0x098E": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T <>",
+     "bodies": 60
+    }
+   ]
+  },
+  "0x098F": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T <>",
+     "bodies": 60
+    }
+   ]
+  },
+  "0x099F": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T <> T T T T T T",
+     "bodies": 60
+    }
+   ]
+  },
+  "0x4107": {
+   "bodies": 4,
+   "structures": [
+    {
+     "skeleton": "<> T",
+     "bodies": 4
+    }
+   ]
+  },
+  "0x4200": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <> T T <> T <>",
+     "bodies": 32
+    },
+    {
+     "skeleton": "<> T <> T <> T T <>",
+     "bodies": 26
+    },
+    {
+     "skeleton": "<> T <> T <> T T <> T T <>",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x4220": {
+   "bodies": 1,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x4221": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T",
+     "bodies": 21
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T",
+     "bodies": 19
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <>",
+     "bodies": 9
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <>",
+     "bodies": 4
+    },
+    {
+     "skeleton": "<> T T T T T <> T T T <>",
+     "bodies": 3
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <>",
+     "bodies": 2
+    },
+    {
+     "skeleton": "<> T T <> T T <> T T T <> T <> T <> T <> T",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x4222": {
+   "bodies": 38,
+   "structures": [
+    {
+     "skeleton": "<> T T <>",
+     "bodies": 38
+    }
+   ]
+  },
+  "0x4224": {
+   "bodies": 1,
+   "structures": [
+    {
+     "skeleton": "<> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x4225": {
+   "bodies": 2,
+   "structures": [
+    {
+     "skeleton": "<> T <>",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x4634": {
+   "bodies": 13,
+   "structures": [
+    {
+     "skeleton": "<>",
+     "bodies": 13
+    }
+   ]
+  },
+  "0x4640": {
+   "bodies": 60,
+   "structures": [
+    {
+     "skeleton": "T T T <> T <>",
+     "bodies": 60
+    }
+   ]
+  },
+  "0x464B": {
+   "bodies": 1,
+   "structures": [
+    {
+     "skeleton": "T <> T",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x464C": {
+   "bodies": 1,
+   "structures": [
+    {
+     "skeleton": "T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x464E": {
+   "bodies": 1,
+   "structures": [
+    {
+     "skeleton": "T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x464F": {
+   "bodies": 1,
+   "structures": [
+    {
+     "skeleton": "T <> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x4650": {
+   "bodies": 1,
+   "structures": [
+    {
+     "skeleton": "T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <> T <>",
+     "bodies": 1
+    }
+   ]
+  },
+  "0x5001": {
+   "bodies": 2,
+   "structures": [
+    {
+     "skeleton": "<> T",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x5003": {
+   "bodies": 39,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <> T <> T <> T <>",
+     "bodies": 24
+    },
+    {
+     "skeleton": "<> T <> T <> T <> T <>",
+     "bodies": 8
+    },
+    {
+     "skeleton": "<> T <> T <> T <> T",
+     "bodies": 7
+    }
+   ]
+  },
+  "0x5038": {
+   "bodies": 20,
+   "structures": [
+    {
+     "skeleton": "<> T <> T <> T <> T <> T <>",
+     "bodies": 13
+    },
+    {
+     "skeleton": "<> T <> T <> T <> T T <>",
+     "bodies": 4
+    },
+    {
+     "skeleton": "<> T <> T <> T <> T <>",
+     "bodies": 3
+    }
+   ]
+  },
+  "0x503A": {
+   "bodies": 2,
+   "structures": [
+    {
+     "skeleton": "<> T",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x503B": {
+   "bodies": 2,
+   "structures": [
+    {
+     "skeleton": "<> T",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x503C": {
+   "bodies": 2,
+   "structures": [
+    {
+     "skeleton": "<> T",
+     "bodies": 2
+    }
+   ]
+  },
+  "0x503D": {
+   "bodies": 2,
+   "structures": [
+    {
+     "skeleton": "<> T",
+     "bodies": 2
+    }
+   ]
+  }
+ }
+}

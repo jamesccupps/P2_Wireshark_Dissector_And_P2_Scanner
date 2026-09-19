@@ -1,5 +1,75 @@
 # Changelog
 
+## Unreleased
+
+### Two new components: a virtual PXC, and a P2 → BACnet bridge
+
+**[`virtual_pxc/`](virtual_pxc/)** — a virtual APOGEE panel to develop and test a
+P2 client against, with no hardware. What makes it worth pointing a client at is
+that it **refuses what a real panel refuses**:
+
+- `msg_type` is validated as `13 + the total bytes of the four routing slots`
+  (§6.2), and a frame whose value disagrees with its own slots is **dropped
+  silently** — the failure mode that is hard to find in a building and trivial to
+  find here. `0x33` and `0x34` get no special treatment; they are two lengths,
+  not two dialects.
+- An unimplemented opcode gets `not_found`, not a synthetic success.
+- `drop_connections()` and `refuse_connections(n)` exercise a client's reconnect
+  and backoff paths, which are usually the least-tested code it has.
+
+It ships **`reference_shapes.json`**: the structure of real captured panel
+responses across **70 opcodes and 148 distinct structures**, with lengths and
+contents stripped so it is publishable. `verify.py` checks the panel against
+`PROTOCOL.md`'s frame invariants, against that reference, and against the
+protocol document's own virtual-PXC capability list — and reports what it does
+**not** model rather than passing over it.
+
+**[`bridge/`](bridge/)** — a read-only P2 → BACnet/IP bridge. Every P2 point
+becomes a BACnet object, so any BACnet supervisor can read APOGEE PXCs. It is a
+separate application: `bacpypes3` is declared in `bridge/requirements.txt` and
+never at the repository root, and the scanner does not import it, so cloning
+this repository to use the scanner alone still installs nothing.
+
+### First CI in this repository
+
+`.github/workflows/tests.yml` runs both suites on Python 3.10–3.13. The jobs are
+separate on purpose: the virtual PXC installs only pytest, which is the check
+that the dependency direction has not been reversed.
+
+
+### `p2_scanner.py` — eleven real engineering-unit strings were being discarded
+
+`_parse_enum_points_response` decides whether a candidate TLV is an engineering
+unit with `looks_like_units()`, and that function accepted a space-containing
+string **only** when it started with `DEG `, `deg ` or `IN `:
+
+```python
+if ' ' not in s: return True
+if s.startswith('DEG ') or s.startswith('deg '): return True
+if s.startswith('IN '): return True
+return False
+```
+
+Eleven unit strings in the shipped TEC catalog fail that test — `SQ. FT` (336
+occurrences), `PCT RH` (108), `KVA H` (21), `KW H` (21), `SQ FT` (18),
+`10K HR`, `V MA`, `PCT KW`, `K OHM`, `CU FT`, `ERR CD`. **522 occurrences, 2.0%
+of the catalog**, dropped silently: the point still reports its value, with an
+empty unit string. Anything downstream that maps units — a BACnet bridge, a
+trend export, a display — sees nothing to map.
+
+The fix is not a longer allowlist. **The scanner already embeds the catalog**,
+so the set of real unit strings is known rather than guessable. `looks_like_units`
+now consults `known_unit_strings()` first and keeps the shape heuristic only as
+a fallback for a unit the catalog does not carry.
+
+Measured against 60 real `0x0981` response bodies: unit extraction is identical
+except that **two records that previously returned an empty unit now return
+`PCT RH`**. No other value changed.
+
+Found by making a mock panel emit the real `0x0981` body shape rather than an
+invented one — the mock sent `PCT RH` in the exact framing a panel uses and the
+parser returned `''`.
+
 ## v2.9.1 — the correction to the correction (2026-09-18)
 
 ### `PROTOCOL.md` §14.3 — `EQUAL` and `LESS` are reserved words after all
