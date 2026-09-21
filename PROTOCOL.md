@@ -5140,7 +5140,25 @@ The first four are genuinely undeclared, and two of those four are now explained
 an empty `Point_extension2` is exactly two bytes, so `0x0291` and `0x02A8` carry
 a field the library forgot on a structure that its neighbours all have. What
 remains open is narrow — **the meaning of the two single-byte booleans** on
-`0x0987` and `0x5038`. Their width and position are not in doubt. [W][OPEN]
+`0x0987` and `0x5038`. Their width and position are not in doubt. Five readings
+are now **excluded**, which is worth stating so the next reader does not
+re-walk them: [W][S]
+
+- **`panel_logging : IsPanelLogging`**, the trailing field the `_Added_`
+  siblings declare and the `_All_` forms omit — the same asymmetry that
+  explained the `state_text_id` cases above, so it is the obvious candidate.
+  It is **refuted by the wire.** `IsPanelLogging` is a CHOICE, not a boolean,
+  with a complete map `0 loggerOff` (`NULL_`) and `1 loggerOn`
+  (`cabinet_address`, `id`, `date_time`, `reason`, `valid`). Fifty-nine of
+  sixty `0x0987` bodies carry the value **1 with zero bytes remaining**, and
+  tag 1 requires a payload.
+- **`zone_enabled`, `recmd_after_warmstart`, `english_units` and
+  `optimization_osv`**, all already declared inside `Eqs_zone_data` — and
+  **`optimization_enabled`**, declared on `AP2_Upl_All_EQS_Zone_Response`
+  itself and consumed before the trailing byte is reached.
+
+So it is a sixth boolean of the EQS zone object, and the structure library does
+not name it anywhere. **[OPEN]**
 
 **These are in the published package.** `p2_asdu.OP_TAILS` carries all nine and
 `p2_body.py` applies them after the declared structure, naming them so a reader
@@ -5432,8 +5450,36 @@ appears exactly where the struct table says it should. A handful of families car
 additional trailing key. The **TEC** family's is now identified: a 2-byte
 **`application_number`** after the search struct, with `0xFFFF` as the wildcard —
 confirmed across four sibling opcodes, one of whose ASDU definitions omits it
-while the wire carries it. The EQS schedule set and trend delete remain
-**[OPEN]**. [W]
+while the wire carries it. **Trend delete was never a resume key at all**, and the mistake is worth
+keeping because it is a decoder failure that looked like a protocol gap. All
+fourteen `0x0291 AP2_TREND_SETUP_DELETE` requests in the corpus were recorded
+as carrying four undeclared trailing bytes. They carry a **declared** field:
+`which_trend` is a CHOICE whose `specific` arm holds a `Trend_specifier`
+(`number_of_samples : UNSIGNED16`, `trend_type : Trend_type`), and `Trend_type`
+is itself a CHOICE with a complete tag map — `0 point_cov` (`NULL_`),
+`1 trend_cov`, `2 time`. The last two each carry a four-byte `FLOAT_`. On the
+wire: [W]
+
+| `trend_type` | arm | payload | bodies |
+|---|---|---|---:|
+| 0 | `point_cov` | none — the arm is `NULL_` | 6 |
+| 1 | `trend_cov` | `cov_limit` = **3.0** | 2 |
+| 2 | `time` | `seconds_interval` = **60.0** | 4 |
+
+Fourteen of fourteen, exactly consumed. The bytes were falling outside the walk
+because the structure catalog carries a **fixed width for `which_trend_`** and
+the walker consulted it before dispatching the CHOICE — and 4 is the right
+width only when `Trend_type` selects the `NULL_` arm. Fixed in `p2_body.py`;
+corpus-wide, exact decodes went 3,933 → 3,939 and errors 26 → 20 with nothing
+else moving. **A CHOICE's width is a function of the arm its tag selects, so a
+fixed width for one can only ever be right for the arms that happen to match
+it.** [W][S]
+
+The **EQS schedule set** remains **[OPEN]**, and narrower than it was: with the
+CHOICE dispatch corrected, no EQS request opcode in the corpus carries a small
+undeclared tail. What the EQS families do carry is a large **pre-allocated
+request buffer** (§10.1), which is a different thing and must not be read as a
+key. [W]
 
 ### 10.3 Read / command / COV core
 

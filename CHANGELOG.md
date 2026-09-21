@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### A CHOICE read as a fixed width, and a declared field that went missing
+
+`p2_asdu` carries a `WIDTHS` entry for two types that are also CHOICEs, and
+`p2_body`'s walker consulted `WIDTHS` **before** dispatching — so both were read
+as opaque fixed-width blobs.
+
+For `cov_limit_` that is harmless; both arms are four bytes after the tag. For
+`which_trend_` the width of 4 is right only when the nested `Trend_type` selects
+`point_cov`, whose arm is `NULL_`. Select `trend_cov` or `time` and a **declared**
+four-byte `FLOAT_` falls outside the walk.
+
+That is how `PROTOCOL.md` §10.2.3 came to record an **undeclared trailing resume
+key** on the trend-delete request. There is no such key. `0x0291`'s trailing
+bytes are `Trend_type`'s arm payload, and all fourteen corpus bodies now account
+for themselves exactly:
+
+| `trend_type` | arm | payload | bodies |
+|---|---|---|---:|
+| 0 | `point_cov` | none — the arm is `NULL_` | 6 |
+| 1 | `trend_cov` | `cov_limit` = **3.0** | 2 |
+| 2 | `time` | `seconds_interval` = **60.0** | 4 |
+
+Corpus-wide: exact decodes **3,933 → 3,939**, errors **26 → 20**, nothing else
+moved.
+
+The fix suppresses the width lookup for a CHOICE rather than dispatching at that
+point — `All_points` and `Alarm_object` also begin with a `tag_` and have their
+own handlers further down, and dispatching every tag-led structure there
+intercepts them and turns 26 decode errors into 446. Measured, not guessed. Six
+tests, including that one.
+
+
 ### One panel point in four was published as the wrong kind of object
 
 `0x0981` records were read by a three-shape heuristic. `AP2_Upl_All_Point_Response`

@@ -147,7 +147,24 @@ class _Walker(object):
             self.add(path, "real_addr_(%s)" % parent, i, w, bytes(b[i:i + w]))
             return i + w
 
-        w = A.WIDTHS.get(typ)
+        # A CHOICE's width is a function of the arm its tag selects, so a fixed
+        # width can only ever be right for the arms that happen to match it.
+        # Dispatch first, even when the catalog carries a width.
+        #
+        # `gen_asdu.py` emits one for exactly two: `which_trend_` (4) and
+        # `cov_limit_` (5). `cov_limit_`'s is harmless -- both arms are four
+        # bytes after the tag -- but `which_trend_`'s is right only when the
+        # nested `Trend_type` selects `point_cov`, whose arm is NULL_. Select
+        # `trend_cov` or `time` and a declared four-byte FLOAT_ falls outside
+        # the walk, which is how `cov_limit` and `seconds_interval` came to be
+        # recorded as an undeclared trailing resume key (PROTOCOL.md 10.2.3).
+        # Six of fourteen 0x0291 request bodies failed to decode for it.
+        # Skipping the width, rather than dispatching here, is deliberate:
+        # `All_points` and `Alarm_object` also begin with a `tag_` and have
+        # their own handlers below. Dispatching every CHOICE at this point
+        # intercepts them and breaks every point body -- 26 decode errors
+        # become 446, measured.
+        w = None if (typ in A.STRUCTS and _is_choice(typ)) else A.WIDTHS.get(typ)
         if w is not None:
             if i + w > len(b):
                 raise _Fail("truncated %s at %d (%s)" % (typ, i, path))
