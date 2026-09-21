@@ -1016,6 +1016,40 @@ Native P2 over IP runs on **TCP**. Every BLN member — the supervisor and every
 
 The 8-slot model means a panel can be told to listen on an alternate port (e.g. to deconflict with a co-resident supervisor product on the same host, which is the origin of the site-specific TCP/5034 second listener); slot 1 always defaults to 5033 and is the canonical port. A client should default to 5033 and treat any other value as site configuration. See §2.1.5 for why the `|PORT` suffix that appears inside identity strings (e.g. `NODE1|5034`) is part of the *identity string* and is **not** a live port indicator — the same suffixed identity rides whichever TCP port actually carried the frame [W].
 
+#### 4.1.1 The rest of the port surface a panel presents
+
+5033 is where P2 lives, and it is not the only thing a field panel answers on.
+Siemens' own publicly posted IT-integration white paper lists the ports an
+APOGEE installation needs opened, several of them explicitly *"at the field
+panel level"*. Reproduced here because a reader capturing or scanning a panel
+will meet them, and because three of them are protocol-adjacent surfaces this
+corpus has never looked at: [D]
+
+| Port | What the vendor says it is for |
+|---|---|
+| **TCP 5033** | *"Communication to field panels occurs over TCP port 5033"* — P2 itself |
+| **TCP 3001 / 3002** | connectivity directly to an **AEM** device (§4.2), and support for Ethernet and RS-485 field panels |
+| **TCP 999** | **Telnet**, the configuration port of an AEM200 |
+| **TCP 100** | retrieves the **list of programs running at the field panel** |
+| **TCP 135** | RPC endpoint mapper; panel diagnostics |
+| **UDP 161 / 162** | SNMP, on panels with the SNMP option enabled |
+| **TCP 502** | Modbus TCP, via the Modbus driver |
+| **TCP 5441** | **a Siemens tool called "Sniffer" that monitors panel traffic** |
+| **TCP 5442** | **IPSNIFF** — used by the Insight Async service to talk to field panels |
+
+Two of those deserve naming. **TCP 5441 carries a vendor tool whose stated
+purpose is monitoring panel traffic**, and the white paper points at a separate
+Siemens document titled *TCP Port 5441* that explains it. **TCP 5442 is
+"IPSNIFF".** Neither has ever been observed in this corpus, which is entirely
+5033/5034 — but a vendor-supplied traffic monitor is, on its face, the most
+interesting unexamined surface on the panel for anyone studying this protocol,
+and a reader who has one should look there before reverse-engineering anything.
+
+The white-paper table's columns do not align cleanly when extracted, so the two
+rows distinguishing port 100 from port 135 could be the other way round. The
+5033, 5441, 5442 and 999 rows are unambiguous because each names its own port or
+tool. [D][I]
+
 **The 5034 listener and the two-connection pattern.** In the observed Desigo deployment, 5034 is not merely a "site-specific second port" — it is the **supervisor-side inbound listener for the reverse (panel→supervisor) channel**: field panels listen on 5033 for the supervisor's poll/command channel, while the supervisor listens on 5034 for node-originated push/value traffic and node announcements. Each node-pair therefore maintains (at least) two TCP connections — supervisor→panel:5033 and panel→supervisor:5034 — one opened in each direction (§7.3). The exact supervisor port assignment is deployment-specific (it can equally be 5033, and the 8-slot model permits other values), but the **two-listener / two-connection model is the structural pattern**, independent of the specific port numbers. [W]
 
 #### 4.1.1 Surrounding observable service footprint
