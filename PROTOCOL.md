@@ -7841,20 +7841,29 @@ which resolves by arithmetic rather than inference:
 6,144 / 30,720 = 0.20 = 4 / 20   the 4 mA live zero of a 4-20 mA loop
 ```
 
-**The 24,576-count "family" is the 30,720-count converter already in the tables,
-read as a 4–20 mA input**: live zero at 20 % of full scale, usable span
-`30,720 − 6,144 = 24,576`. `25600/24576` is therefore an ordinary count-span
-ratio between an MBC input and a 30,720-count input, and the single rule above
-covers it — the rule was right and the table was missing a row. [S][I]
+**The missing family is `UC`, the unitary controller.** Every conversion in the
+vendor data carrying 24,576 has `UC` as its source and `P2PXC` or `P1BIM` as
+its target, and `UC` is absent from the family list above. It is not a sixth
+*generation* of converter; it is a family the tables never covered. [S]
 
-The contrast with MBC is what makes this a derivation rather than a
-coincidence: MBC's input range is 3,584…29,184, also a span of 25,600, but its
-zero sits at **12.3 %** of its top rather than 20 %. The two are different
-designs, and only one places its live zero where a 4–20 mA loop requires.
+With the source family named, its two input channels separate:
 
-One smaller constant in the same data is **not** yet placed: a conversion of
-the form `slope × 16383/30720`, where `16,383 = 2¹⁴ − 1` implies a **14-bit**
-target that no table in §11.5 currently names. **[OPEN]**
+| `UC` channel | counts | span | live zero |
+|---|---|---:|---|
+| current (`AII`, `AOI`) | 6,144 … 30,720 | **24,576** | **20.0 %** = 4/20 mA |
+| voltage (`AIV`) | 3,584 … 29,184 | **25,600** | 12.3 % |
+
+The voltage row is why `3,584` looks familiar: **`UC`'s voltage channel uses
+the very range this section already documents for MBC input.** One family, two
+channel designs, and the tables carried only one of them. `25600/24576` is
+therefore an ordinary count-span ratio between the two `UC` channels' scales —
+the single rule above covers it, and the table was missing a row rather than
+the rule being wrong. [S][I]
+
+One further conversion in the same data is placed but not yet tabulated:
+`UC → P2PXC`, `AOV → AOV`, `slope × 16383/30720` with an identity intercept.
+`16,383 = 2¹⁴ − 1`, so the target is a **14-bit** analog voltage output on the
+`P2PXC`. Which table in §11.5 should carry it is unsettled. **[OPEN]**
 
 **The sub-type vocabulary itself.** This document names a per-point *Sensor
 Type* without ever giving its value set. The vendor's termination data
