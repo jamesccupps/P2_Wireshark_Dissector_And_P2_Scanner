@@ -106,6 +106,24 @@ def test_p2_type_refuses_a_code_the_vendor_table_does_not_hold():
     assert P2Connection._p2_type_for(7) == "digital_ro"    # LOOAP, three states
 
 
+def test_the_three_speed_types_are_digital_despite_having_no_default_enum():
+    """LFMSSL/LFMSSP broke the "has a default enum => digital" heuristic.
+
+    The vendor enum library defines no `-22`/`-23` default state text, so the
+    heuristic classified a four-state motor-speed point as an analog value.
+    PROTOCOL.md 11 lists both among the digital-only fast/slow/stop families
+    and their ASDU structures carry a `state_text_table` like every other
+    enumerated type.
+    """
+    for code in (22, 23):
+        assert P2Connection._p2_type_for(code) == "digital_ro"
+        assert P2Connection._n_states_for(code) == 4
+    # and the heuristic still holds for the genuinely analog types
+    for code in (3, 4, 11, 20, 24):
+        assert P2Connection._p2_type_for(code) == "analog_ro"
+        assert P2Connection._n_states_for(code) is None
+
+
 @pytest.mark.parametrize("point_type,expected", [
     (1, 2),      # LDI    OFF / ON
     (2, 2),      # LDO    OFF / ON
@@ -116,13 +134,15 @@ def test_p2_type_refuses_a_code_the_vendor_table_does_not_hold():
     (14, 3),     # LFSSL  STOP / SLOW / FAST
     (15, 3),     # LFSSP
     (21, 6),     # LENUM
+    (22, 4),     # LFMSSL Fast / Medium / Slow / Stop -- no default enum
+    (23, 4),     # LFMSSP Fast / Medium / Slow / Stop -- no default enum
 ])
 def test_the_state_count_comes_from_the_vendor_enumeration(point_type, expected):
-    """"digital" is a lossy word for five of the point types.
+    """"digital" is a lossy word for seven of the point types.
 
-    A binary object holds two states. These carry three or six, and the
+    A binary object holds two states. These carry three, four or six, and the
     vendor's own model has multiStateInput/Output/Value for exactly that. None
-    of the five occurs anywhere in this corpus, so nothing maps them -- but a
+    of the seven occurs anywhere in this corpus, so nothing maps them -- but a
     consumer can now see the count instead of watching AUTO read as ON.
     """
     assert P2Connection._n_states_for(point_type) == expected

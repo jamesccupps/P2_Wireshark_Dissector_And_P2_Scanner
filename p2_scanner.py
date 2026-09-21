@@ -2081,6 +2081,26 @@ class P2Connection:
             "n_states": P2Connection._n_states_for(point_type),
         }
 
+    # Digital multi-state types for which the vendor enum library defines NO
+    # default state-text enumeration.  Value is the state count.
+    #
+    # "has a default enum => digital" is a good heuristic and it is wrong here.
+    # PROTOCOL.md §11 lists LFMSSL/LFMSSP among the digital-only on/off/auto and
+    # fast/slow/stop families, and their ASDU structures carry a
+    # `state_text_table` like every other enumerated type -- but the library has
+    # no `-22`/`-23` default, so the heuristic silently called them analog and a
+    # 4-state motor-speed point was published as an analog value.
+    #
+    # The count comes from the mnemonic (Fast/Medium/Slow/Stop) and agrees with
+    # the subpoint tables: the pulsed variant carries one DO per state (4 DO =
+    # 4 states), exactly as LFSSP carries 3 DO for STOP/SLOW/FAST.  The state
+    # *text* is genuinely unknown -- the vendor library supplies none, and this
+    # tool does not invent it.
+    _DIGITAL_NO_DEFAULT_ENUM = {
+        22: 4,      # LFMSSL  Fast/Medium/Slow/Stop latched, 3 latched DO + DI
+        23: 4,      # LFMSSP  Fast/Medium/Slow/Stop pulsed,  4 pulsed DO + DI
+    }
+
     @staticmethod
     def _p2_type_for(point_type: Optional[int]) -> Optional[str]:
         """The analog/digital split, from the vendor's own point-type table.
@@ -2097,6 +2117,8 @@ class P2Connection:
         """
         if point_type is None or point_type not in p2_data.POINT_TYPES:
             return None
+        if point_type in P2Connection._DIGITAL_NO_DEFAULT_ENUM:
+            return "digital_ro"
         return ("digital_ro" if p2_data.default_enum_for(point_type) is not None
                 else "analog_ro")
 
@@ -2107,6 +2129,8 @@ class P2Connection:
         Two means a binary object holds it. More does not: `LOOAP`/`LOOAL` are
         OFF/ON/**AUTO**, `LFSSL`/`LFSSP` are STOP/SLOW/FAST, `LENUM` has six.
         """
+        if point_type in P2Connection._DIGITAL_NO_DEFAULT_ENUM:
+            return P2Connection._DIGITAL_NO_DEFAULT_ENUM[point_type]
         eid = (p2_data.default_enum_for(point_type)
                if point_type is not None else None)
         if eid is None:
