@@ -7820,11 +7820,52 @@ moving a point between those two groups moves the engineering zero by exactly
 4 mA. It is not a per-generation fudge factor; it is the live zero appearing in
 engineering units because the two families disagree about whether there is one.
 
-The one constant this does not account for is **`25600/24576`**. No family in
-§11.5.1.1's tables has a 24,576-count span, so a sixth input generation exists
-that those tables do not cover — `24,576 = 24 × 1024`, against MBC's
-`25,600 = 25 × 1024`, which makes it look like a near neighbour of the MBC
-rather than a different class. **[OPEN]**
+**`25600/24576` used to be the loose end here, and it is now closed.** This
+section previously reported that no family in §11.5.1.1's tables has a
+24,576-count span, and inferred a sixth input generation the tables did not
+cover. There is no sixth generation. The vendor's own termination-conversion
+data carries the 24,576 conversions as literal arithmetic, and the intercept
+term names the source zero offset directly:
+
+```
+slope'     = slope × 2602/24576
+intercept' = intercept + slope × 650 − (2602/24576) × slope × 6144
+                                                            ^^^^
+                                          the source zero offset, in counts
+```
+
+which resolves by arithmetic rather than inference:
+
+```
+6,144 + 24,576 = 30,720          the span sits under the SAME full scale
+6,144 / 30,720 = 0.20 = 4 / 20   the 4 mA live zero of a 4-20 mA loop
+```
+
+**The 24,576-count "family" is the 30,720-count converter already in the tables,
+read as a 4–20 mA input**: live zero at 20 % of full scale, usable span
+`30,720 − 6,144 = 24,576`. `25600/24576` is therefore an ordinary count-span
+ratio between an MBC input and a 30,720-count input, and the single rule above
+covers it — the rule was right and the table was missing a row. [S][I]
+
+The contrast with MBC is what makes this a derivation rather than a
+coincidence: MBC's input range is 3,584…29,184, also a span of 25,600, but its
+zero sits at **12.3 %** of its top rather than 20 %. The two are different
+designs, and only one places its live zero where a 4–20 mA loop requires.
+
+One smaller constant in the same data is **not** yet placed: a conversion of
+the form `slope × 16383/30720`, where `16,383 = 2¹⁴ − 1` implies a **14-bit**
+target that no table in §11.5 currently names. **[OPEN]**
+
+**The sub-type vocabulary itself.** This document names a per-point *Sensor
+Type* without ever giving its value set. The vendor's termination data
+enumerates it: `AI_THERMISTOR`, `AI_THERMISTOR_1K`, `AI_THERMISTOR_100K`,
+`AI_CURRENT`, `AI_VOLTAGE`, `AI_PNEUMATIC`, `AI_RTD_1K`, `AI_RTD_1K_385`,
+`AI_NICKEL` and `AI_ON_TCU`, with the short forms `AI10K`, `AI375`, `AI385`
+and `AINI1000`, and the channel option codes `AII` / `AIV` / `AIP` / `AI100K`
+and `AOI` / `AOV` / `AOP` / `AOV16` / `AOR`, glossed respectively as current,
+voltage, pneumatic and resistance. [S] An implementer needs these because the
+conversion above is keyed by sub-type: the same raw count means a different
+engineering value under `AI_RTD_1K` than under `AI_RTD_1K_385`.
 
 The practical consequence for anyone reading a point database: **a slope and
 intercept are only meaningful alongside the sub-type and the termination
