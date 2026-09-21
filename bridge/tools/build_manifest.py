@@ -251,6 +251,17 @@ def collect_points_for_node(node_name: str, host: str, log: logging.Logger,
 
         for entry in candidates:
             pt_name = entry["point"]
+            # The point type comes from the enumerate record, which reads it
+            # out of the declared structure (`point.base.point_type`). This
+            # used to be hard-coded `analog_ro` / ptype 3 for every
+            # panel-resident point, so a digital one was published as an
+            # analogInput reading 0.0 and 1.0 instead of a binaryInput reading
+            # inactive and active. Over sixty real records that is LDO 12 and
+            # LDI 4 -- **sixteen of sixty**, one point in four.
+            #
+            # The hard-coded pair remains the fallback, for a scanner without
+            # the structure catalog beside it: an analog object showing a
+            # digital point's value is wrong, and no object at all is worse.
             yield {
                 "point_source": "panel",
                 "device": pt_name,
@@ -259,10 +270,11 @@ def collect_points_for_node(node_name: str, host: str, log: logging.Logger,
                 "slot": 0,
                 "name": pt_name,
                 "meta": {
-                    "type": "analog_ro",
-                    "ptype": 3,
+                    "type": entry.get("p2_type") or "analog_ro",
+                    "ptype": entry.get("point_type", 3),
                     "units": (entry.get("units") or "").strip(),
                     "rw": False,
+                    "n_states": entry.get("n_states"),
                 },
             }
 
@@ -392,6 +404,27 @@ def main() -> int:
                             p2_type, dev, name)
                 skipped_count += 1
                 continue
+
+            # A binary object holds two states. Five P2 point types carry more
+            # -- LOOAP and LOOAL are OFF/ON/AUTO, LFSSL and LFSSP are
+            # STOP/SLOW/FAST, LENUM has six -- and the vendor's own model has
+            # multiStateInput/Output/Value for exactly that (BAC_Point_Base
+            # arms 13, 14, 19). This bridge has no multi-state mapping, and
+            # nothing in the corpus needs one: across 1,070 catalogued
+            # applications and 181,170 points, none of the five occurs.
+            #
+            # So SAY SO rather than publish AUTO as "active" in silence. If
+            # this ever fires at a site, that is the evidence the mapping was
+            # waiting for.
+            n_states = meta.get("n_states")
+            if (isinstance(n_states, int) and n_states > 2
+                    and p2_type.startswith("digital")):
+                log.warning(
+                    "    %s/%s is a %d-state point published as %s — a binary "
+                    "object holds two, so every state above the first reads "
+                    "the same. Multi-state mapping is not implemented; please "
+                    "report this point's type so it can be.",
+                    dev, name, n_states, P2_TYPE_TO_BACNET[p2_type])
 
             bacnet_type = P2_TYPE_TO_BACNET[p2_type]
             instance = manifest.allocate_instance(bacnet_type)

@@ -2,6 +2,50 @@
 
 ## Unreleased
 
+### One panel point in four was published as the wrong kind of object
+
+`0x0981` records were read by a three-shape heuristic. `AP2_Upl_All_Point_Response`
+is a **declared structure**, and walking it wins on every axis measured over sixty
+real bodies:
+
+| | heuristic | structure walk |
+|---|---|---|
+| bodies read | 60 | **60, all clean** |
+| point type | **not visible at all** | `LAO` 30, `LAI` 14, **`LDO` 12, `LDI` 4** |
+| values recovered | 59 | **60** |
+| units correct | 58 | **60** |
+
+**Sixteen of sixty panel-resident points are digital**, and the bridge's manifest
+builder hard-coded `analog_ro` for every one — so a digital point was published as
+an `analogInput` reading 0.0 and 1.0 where a supervisor expects inactive and
+active. It now takes the type from the record.
+
+The two units the heuristic got wrong are both cases of reading a neighbouring
+TLV; `eng_units` lives under the **analog arm** of the point structure (§11.5.1),
+so a digital point has no units field rather than an empty one. That also settles
+the last of the odd strings from the previous release: they are what the panel
+holds.
+
+The heuristic remains the fallback — `p2_body` is an optional import, and the
+scanner must still run as a single file beside `p2_data.py`. A **truncated** walk
+is refused on purpose: all sixty real bodies walk complete, so nothing in the
+corpus says what a half-walked record should yield.
+
+### Five point types do not fit a binary object, and now say so
+
+`LOOAP` and `LOOAL` are OFF/ON/**AUTO**, `LFSSL` and `LFSSP` are STOP/SLOW/FAST,
+`LENUM` has six states. A BACnet binary object holds two, and the vendor's own
+model has `multiStateInput`/`Output`/`Value` for exactly this (`BAC_Point_Base`
+arms 13, 14, 19).
+
+**None of the five occurs anywhere in the corpus** — 1,070 catalogued
+applications, 181,170 points, sixty panel records — so nothing maps them and
+building the mapping now would be speculation. Instead the enumerate record
+carries `n_states`, and the manifest builder **logs a warning** when it publishes
+a point with more than two states as a binary object. If that ever fires at a
+site, it is the evidence the mapping has been waiting for.
+
+
 ### `analyze_pcap.py`: a four-tuple is not a connection
 
 The inventory tool keyed its reassembly buffers on

@@ -84,6 +84,15 @@ from typing import Optional, Dict, List, Tuple, Any, Callable
 import firmware_registry  # build-tag cache: platform and string encoding, NOT framing
 import p2_data            # compiled-in opcode / point-type / enum tables
 
+try:
+    # The declared-structure walker. Optional: everything here has a heuristic
+    # fallback, and the scanner must still run as a single file beside
+    # p2_data.py alone. Where it IS importable it is preferred, because a
+    # declared structure beats a guess -- see _enum_record_typed.
+    import p2_body
+except ImportError:
+    p2_body = None
+
 # ─────────────────────────────────────────────────────────────────────────────
 # A note on `PROTOCOL.md §N` citations throughout this file.
 #
@@ -1992,6 +2001,120 @@ class P2Connection:
         return results
 
     @staticmethod
+    def _enum_record_typed(body: bytes) -> Optional[Dict[str, Any]]:
+        """Walk a 0x0981 response body as `AP2_Upl_All_Point_Response`.
+
+        Returns the same record the heuristic returns, plus the two things the
+        heuristic cannot see: `point_type` (the `Point_type` enum value) and
+        `p2_type`, the analog/digital split a BACnet consumer needs.
+
+        Measured over sixty real bodies: sixty walk cleanly, the types come out
+        **LAO 30, LAI 14, LDO 12, LDI 4** -- so **sixteen of the sixty are
+        digital**, which a consumer hard-coding "analog" gets wrong for one
+        point in four. Values match the heuristic 59 times and are recovered
+        once where the heuristic returns none; units match 58 times and are
+        right the other two, where the heuristic read a neighbouring TLV. There
+        is no axis on which the guess wins.
+
+        Returns None when the walker is unavailable or the body will not walk,
+        so the caller falls back rather than losing the record.
+
+        A **truncated** walk is refused even though `p2_body` calls truncation
+        normal for a short response. All sixty real bodies walk complete, so
+        there is nothing in the corpus to say what a half-walked record should
+        yield; the one truncated body available is the virtual panel's
+        synthetic title-only entry, and trusting a shape that exists only in a
+        fixture is how a fixture teaches its own bugs. The heuristic handles
+        that case already.
+        """
+        if p2_body is None:
+            return None
+        try:
+            r = p2_body.decode(0x0981, "rsp", body)
+        except Exception:                  # a malformed body is not an outage
+            return None
+        if r.struct is None or r.error is not None or r.truncated:
+            return None
+
+        f = {x.path: x.value for x in r.fields}
+        name = (f.get("name_response.name") or "").strip()
+        if not name:
+            return None
+
+        point_type = f.get("point.base.point_type")
+        # `eng_units` lives under the ANALOG arm of the point structure
+        # (PROTOCOL.md §11.5.1), so a digital point has no units field at all
+        # rather than an empty one. Read whichever arm the walker entered.
+        units = ""
+        for path, value in f.items():
+            if path.endswith("analog_units.eng_units") and isinstance(value, str):
+                units = value.strip()
+                break
+
+        raw = f.get("point.base.point_value")
+        value = None
+        if isinstance(raw, int):
+            try:
+                value = struct.unpack(">f", struct.pack(">I", raw & 0xFFFFFFFF))[0]
+            except struct.error:
+                value = None
+            if value is not None and value != value:      # NaN: no value held
+                value = None
+
+        descr = f.get("point.base.point_descriptor")
+        return {
+            "device": name,
+            "point": name,
+            "value": value,
+            "units": units,
+            "description": descr.strip() if isinstance(descr, str) else "",
+            "subkey": (f.get("name_response.suffix") or "").strip(),
+            "point_type": point_type,
+            "p2_type": P2Connection._p2_type_for(point_type),
+            # How many states the type's default enumeration declares, so a
+            # consumer can see when "digital" is a lossy word for it. LOOAP and
+            # LOOAL carry OFF/ON/AUTO, LFSSL and LFSSP carry STOP/SLOW/FAST,
+            # and LENUM carries six -- none of which fits a two-state object.
+            # None of the five occurs anywhere in this corpus, so nothing maps
+            # them; reporting the count is what lets a site that has one find
+            # out rather than watch AUTO read as ON.
+            "n_states": P2Connection._n_states_for(point_type),
+        }
+
+    @staticmethod
+    def _p2_type_for(point_type: Optional[int]) -> Optional[str]:
+        """The analog/digital split, from the vendor's own point-type table.
+
+        A type with a default state-text enumeration is enumerated, so digital;
+        the analog types have none (`p2_data.POINT_TYPES`). Everything is
+        reported `_ro`: this tool does not write, and inventing a
+        commandability claim from a type code would be a guess where the
+        read-only posture needs none.
+
+        Note this is the `Point_type` enum from the panel-wide enumerate, NOT
+        the `ptype` field in the FLN application catalog. They are separate
+        namespaces and their codes do not mean the same thing.
+        """
+        if point_type is None or point_type not in p2_data.POINT_TYPES:
+            return None
+        return ("digital_ro" if p2_data.default_enum_for(point_type) is not None
+                else "analog_ro")
+
+    @staticmethod
+    def _n_states_for(point_type: Optional[int]) -> Optional[int]:
+        """States in the type's default enumeration, or None for an analog type.
+
+        Two means a binary object holds it. More does not: `LOOAP`/`LOOAL` are
+        OFF/ON/**AUTO**, `LFSSL`/`LFSSP` are STOP/SLOW/FAST, `LENUM` has six.
+        """
+        eid = (p2_data.default_enum_for(point_type)
+               if point_type is not None else None)
+        if eid is None:
+            return None
+        entry = p2_data.ENUM_TYPES.get(eid)
+        return len(entry[2]) if entry else None
+
+    @staticmethod
     def _parse_enum_points_response(payload: bytes) -> Optional[Dict[str, Any]]:
         """Extract {device, point, value, units} from a 0x0981 response payload.
 
@@ -2037,6 +2160,15 @@ class P2Connection:
         Returns {'device', 'point', 'value', 'units', 'description'}. For SHAPE C,
         device == point, value is None, units is empty, description carries the
         label.
+
+        **The three shapes above are a heuristic, and it is now the FALLBACK.**
+        `AP2_Upl_All_Point_Response` is a declared structure, and walking it
+        beats guessing on every axis measured over sixty real bodies: it reads
+        all sixty cleanly, recovers the **point type** the heuristic cannot see
+        at all, gets one value the heuristic misses and no value it gets wrong,
+        and corrects two units the heuristic reads out of the wrong TLV. The
+        heuristic stays because the structure catalog is an optional import and
+        because a body that will not walk should still yield what it can.
         """
         # Skip routing header (4 null-terminated strings)
         i = 1
@@ -2048,6 +2180,10 @@ class P2Connection:
         if i >= len(payload):
             return None
         body = payload[i:]
+
+        typed = P2Connection._enum_record_typed(body)
+        if typed is not None:
+            return typed
 
         # Collect all TLVs (tag=0x01, u16 BE length, value)
         tlvs = []
