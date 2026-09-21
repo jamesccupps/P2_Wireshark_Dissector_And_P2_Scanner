@@ -5061,6 +5061,66 @@ each, from research hosts, never from a supervisor or a panel in normal
 operation. That is why they carry no body documentation and no family: nothing
 is known about them beyond the response class.
 
+#### 9.5.3 Twenty-six opcodes named from a display-string pool
+
+A separate set of opcodes is *named* without being observed. A vendor
+diagnostic tool carries a packed pool of **565 command display names** in its
+data section, and the pool's **address order encodes the opcode**: within a
+run, `index + opcode` is constant, so each successive string is one opcode
+lower. This is the same relation the EBln command pool follows (§10.6), with
+one difference — there is no single base. The pool is a sequence of contiguous
+runs, one per operation family, with jumps between them.
+
+Fitting it against the operation names this document already carries gives
+**197 anchors**, which segment into **43 runs, 28 of them with three or more
+members**. Within a run's span an unanchored name takes the run's base.
+
+**The derivation is checkable, and it checks.** Fourteen of the forty names it
+binds turn out to have an independent catalog entry whose *word order differs*,
+so name-matching could not have found them — and all fourteen agree:
+`0x4001` Team Descriptor Add, `0x4002`–`0x4006` the Analog / Digital / LENUM /
+LPACI / L2SL member-descriptor adds, `0x0222` Point Log Ctrl Status, `0x0224`
+Point Log Totalized, `0x4204` Controller Remove, `0x5037` EQS Display Command
+Table. `0x4200` sits at a run endpoint and matches the `TEC_LOG` pairing §10.9.1
+established from 242 bodies. [S]
+
+The remaining twenty-six name an opcode this document did not:
+
+| Opcode | Name | Opcode | Name |
+|---|---|---|---|
+| `0x0296` | Trend Definition Display | `0x0297` | Trend Multi-Point Display |
+| `0x0298` | Trend Setup Modify | `0x029A` | Trend Setup Copy |
+| `0x0310` | PB Poll | `0x0311` | Print Error |
+| `0x0312` | PPCL OIP | `0x0502` | Alarm Point Query Enh Alarmable |
+| `0x0503` | Alarm Point Query Record Enh Alarmable | `0x0527` | Alarm Mode Modify Setup |
+| `0x052E` | Alarm Mode Log | `0x052F` | Alarm Mode Check |
+| `0x3801` | RACS Partner Copy | `0x3815` | RACS Port Enable |
+| `0x3816` | RACS Port Log | `0x4007` | Reference Add |
+| `0x4008` | Reference Remove | `0x4009` | Reference Look |
+| `0x400A` | Reference Log | `0x4207` | TEC Query List |
+| `0x4242` | UC Copy | `0x4243` | UC Modify |
+| `0x4246` | UC Definition | `0x4247` | UC Query Record |
+| `0x4248` | UC Query List | `0x4302` | LON Copy |
+
+Each completes a family the catalog already carries in part — `Reference
+Add/Remove/Look/Log` finishing the team-descriptor block that opens at
+`0x4001`, the `UC` set at `0x4242`–`0x4248`, and `TEC Query List` filling
+`0x4207` in a run whose `0x4200` and `0x4204` are both independently confirmed.
+[S]
+
+**What this is and is not.** It is a **name** for an opcode, derived from
+position in a display-string pool and validated on fourteen independent cases.
+It is **not** a body definition, a direction, or evidence that a panel
+implements the operation — none of the twenty-six appears in the corpus. Treat
+them as the catalog's naming, not as observed behaviour. [S] **[OPEN]**
+
+**Three fifths of the pool stays unbound.** 347 of the 565 names lie outside
+every validated run, in stretches with too few anchors to fit a base.
+Extending a run past its last confirmed member would be extrapolation rather
+than derivation, and this document does not do it. A serial-side capture would
+supply the missing anchors; so would the numeric code the tool prints when a
+panel rejects a command it does not know. **[OPEN]**
+
 **The conclusion is narrow and worth stating precisely.** It is *not* that these
 are secret operations; it is that **the supervisor-side function-code
 enumeration is not a complete inventory of what a panel implements.** Six
