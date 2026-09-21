@@ -2877,10 +2877,31 @@ another type has been seen. The practical rule: a decoder must take the TLV from
 its position in the structure and must **never** test `textType == 0x01` to
 decide whether one is present — a parser that does will desynchronise on an
 empty field, which is exactly how twelve point bodies in this corpus fail to
-decode. `textType` is a **[OPEN]** discriminator: the device-side string
-handling distinguishes RAD-50 from ASCII (§8.4), which is the obvious candidate
-for what it selects, but no non-`0x01` value with content exists here to
-confirm it.
+decode.
+
+**`textType` is a declared enumeration, and it is not the RAD-50 selector.** An
+earlier edition left it open and named the firmware's RAD-50/ASCII choice (§8.4)
+as the obvious candidate. The type system settles it: [S]
+
+| `textType` | name |
+|---:|---|
+| 0 | `UNICODE` |
+| **1** | **`ASCII`** |
+| 2 | `DBCS` |
+
+So `0x01` on every non-empty TLV in the corpus means **ASCII**, and the 24 TLVs
+carrying `0x00` are **empty UNICODE strings** rather than a second spelling of
+the empty string. RAD-50 is not among the three, which fits what §8.4 already
+says about it: the RAD-50/ASCII choice is a property of a **firmware revision**,
+negotiated once, not a per-string discriminator — two different axes that an
+earlier reading had conflated.
+
+What remains is much narrower: **no non-empty `UNICODE` or `DBCS` string exists
+in this corpus**, so whether `textLen` counts *bytes* or *characters* for those
+two is unresolved. For ASCII the two coincide and the question does not arise.
+A decoder meeting a `textType` of 0 or 2 with content should treat the length as
+bytes — the field is declared over `Byte[]` — and say that it is assuming.
+**[OPEN]**
 
 **The length is two bytes, not one.** An earlier edition of this section
 described the primitive as a fixed 2-byte prefix `01 00` followed by a
