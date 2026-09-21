@@ -11,6 +11,7 @@
   - [1.5 Lineage (informative)](#15-lineage-informative)
   - [1.6 Conformance levels](#16-conformance-levels)
   - [1.7 What this document does not give you](#17-what-this-document-does-not-give-you)
+  - [1.7a What else is public, and why this document exists](#17a-what-else-is-public-and-why-this-document-exists)
 - [2. Architecture & Layering](#2-architecture--layering)
   - [2.1 The layered stack](#21-the-layered-stack)
   - [2.2 Node roles and the object hierarchy](#22-node-roles-and-the-object-hierarchy)
@@ -389,6 +390,43 @@ catalog. Where a claim is `[W]` **and** the alternatives are shown to fail — "
 of 60 bodies consume at width 2, 0 of 60 at width 1" — a second site cannot
 overturn it either. The claims to treat carefully are the `[W]` ones asserting
 that a value is *stable*; §1.4.1.1 says why.
+
+### 1.7a What else is public, and why this document exists
+
+A reasonable first question is whether any of this is already written down. It
+is not, and the vendor said so in public.
+
+On a controls engineering forum in **November 2001**, an engineer at a
+protocol-gateway manufacturer asked plainly: *is the P2 protocol open, and where
+can the specification be obtained?* The reply came the next day from a systems
+architect in Siemens Building Technologies' own building-automation division:
+
+> **Alas, it is not open** — perhaps more because I didn't document it very well
+> than because it's any big secret.
+
+A second respondent: *"anything but open. Getting any info on that is like
+pulling teeth."* [D]
+
+Twenty-five years later the position is unchanged. Searching the open web,
+GitHub, GitLab, PyPI, SourceForge and the Wireshark plugin ecosystem finds **no
+published wire specification and no other open-source implementation** of either
+P1 or P2. Searching the public ICS packet-capture collections — netresec,
+IMPACT, 4SICS, the university and national-laboratory datasets — finds Modbus,
+S7, DNP3 and BACnet, and **no P2 capture at all**. [D]
+
+**What does exist is commercial.** At least three vendors ship working P2
+implementations: a software gateway presenting P2 panels and TEC devices as
+BACnet devices over both RS-485 and Ethernet; a native P2 driver for a
+third-party supervisory platform; and a general protocol-gateway line listing
+P1, FLN, P2 and XNET among the legacy families it converts. Their feature lists
+are useful as a capability census — see §11.7 — and none of them publishes a
+byte of wire format. **A product that speaks P2 proves the protocol is
+implementable, not that anyone has written down how.** [D]
+
+So this document is not a restatement of a specification that exists elsewhere.
+Where an external source *does* say something — the four-variant taxonomy of
+§2, the RAD-50/ASCII split of §8.4, the P1 datalink of §4.4.1 — it is noted, and
+in each case it agrees with what the wire shows.
 
 
 ## 2. Architecture & Layering
@@ -1075,6 +1113,41 @@ Beneath each panel sits the Field Level Network (FLN), running **P1 (Powers Prot
 On a modular panel the RS-485 FLN trunks are provided either by built-in ports or by an add-on **RS-485 FLN expansion module** — Siemens' `PXX-485.3` carries "three RS-485 P1 FLN connections OR one MS/TP FLN connection" per the public *PXC Modular Series* datasheet. This module sits on the panel's downstream (field) bus and is wholly separate from the upstream ALN/supervisor link that carries P2 — it has no bearing on the P2 wire framing (§6.2). [D]
 
 A panel may alternatively host a BACnet MS/TP fieldbus in place of P1 (`Fln_type_enum`: `P1` = 0, `MSTP` = 1) [S]. Which one is available tracks the panel's **firmware track**, not the hardware: proprietary-P2/APOGEE firmware (the subject of this spec) drives a **P1 FLN only**, while the separate BACnet firmware build of the same hardware adds the MS/TP option. MS/TP is a different protocol stack and is out of scope for this P2 specification; only the P1/FLN bus is treated here. [D]
+
+#### 4.4.1 The P1 datalink, from the equipment vendors who have to publish it
+
+P2 has no public description (§1.7a). **P1 does**, and from an unexpected
+direction: every VFD, meter and drive maker that sells an APOGEE-compatible
+interface must tell its customers how to wire and address it, so those manuals
+state the datalink outright. The following is consistent across several of them
+and is **not** from Siemens: [D]
+
+| Property | Value |
+|---|---|
+| Character format | asynchronous, **8 data bits, no parity, 1 stop bit** |
+| Duplex | **half duplex**; no handshaking |
+| Bit order | **LSB first** |
+| Error detection | **CRC-16, transmitted MSB first** |
+| Medium | RS-485, up to **32 nodes** on a link |
+| Rate | typically **4800 bps**; 9600 on some device types |
+| Access | strict master/slave — the field cabinet initiates every exchange and a device answers only when addressed |
+| Device address | **0–99**, with **99 reserved for configuration** and 1–98 for live devices |
+| Value range | *"the largest value that can be transmitted using the P1 protocol is 32767"* — a signed 16-bit quantity |
+
+Two of these are datalink facts §4.5 previously listed as unobserved: the **bit
+order** and the **error check**. They are still not wire-measured here — no P1
+capture exists in this corpus — but they are now *named*, which changes the open
+item from "unknown" to "unverified".
+
+Note the address range disagrees with §4.4's table above, which gives drop
+addresses **0–31** from Siemens' own material against these manuals' **0–99**.
+Both can be true: 0–31 is the capacity of one trunk, 0–99 the range the address
+field can express. A reader should not assume a drop number above 31 is invalid
+because this document says 32 devices. [D][I]
+
+These manuals also name a Siemens document this project has never seen: **"the
+Siemens P1 Protocol Design Specification"**. Its existence is worth recording
+even though its contents are not available. [D]
 
 ### 4.5 Open items — serial and field-bus framing
 
@@ -8010,6 +8083,38 @@ analogs. **This is a second, independent check on §10.4.6's tag map**, which wa
 recovered from the reference implementation and validated against ASHRAE's object-type
 numbering: the arms carry the properties ASHRAE assigns to exactly those object
 types.
+
+#### 11.7.1 Two outside checks on the twelve, and one correction
+
+**A commercial P2 driver counts twelve too.** A third-party native-P2 driver for
+a supervisory platform advertises support for *"all 12 P2 point types, including
+analog, digital and enumerated."* That number was reached here from the vendor's
+type system — twelve of the sixteen point types have a typed
+`AP2_BAC_Point_Add_<LTYPE>` form — and it is reached independently by someone
+who had to implement against real panels. Two routes, same twelve. [D]
+
+**But the panel's own BACnet side does not expose all nine object types.** The
+publicly posted Protocol Implementation Conformance Statement for a current PXC
+lists the standard object types it supports:
+
+> Analog Input, Analog Output, Analog Value, Binary Input, Binary Output,
+> Binary Value, Calendar, Command, Device, Event Enrollment, File,
+> **Multi-state Output, Multi-state Value**, Notification Class, Schedule,
+> Trend Log
+
+`BAC_Point_Base` declares nine arms — AI 0, AO 1, AV 2, BI 3, BO 4, BV 5,
+**MI 13**, MO 14, MV 19 (§10.4.6). The shipped controller supports **MO and MV
+and not MI**. So an implementer mapping an enumerated P2 point onto a BACnet
+object should reach for `multiStateValue`, not `multiStateInput`: the type
+system permits the latter and the product does not ship it. [D][S]
+
+The same statement gives two further facts worth having, both about the
+**BACnet** side and neither transferable to P2: the controller serves COV —
+`DS-COV-B` and `DS-COVU-B`, subscribed and unsolicited — and it both sends and
+receives **segmented** messages with a window size of 32. **That is BACnet
+segmentation, at the BACnet layer.** It says nothing about §6.7's open question,
+which is about segmentation of a P2 body, and a reader must not carry the one
+across to the other. [D]
 
 **What this says about scope.** §3.2.4 places the BACnet stack out of scope and
 that stands — none of this is needed to speak P2. But the boundary is not where
