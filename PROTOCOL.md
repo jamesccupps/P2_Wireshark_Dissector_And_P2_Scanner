@@ -1066,7 +1066,7 @@ corpus has never looked at: [D]
 | Port | What the vendor says it is for |
 |---|---|
 | **TCP 5033** | *"Communication to field panels occurs over TCP port 5033"* — P2 itself |
-| **TCP 3001 / 3002** | connectivity directly to an **AEM** device (§4.2), and support for Ethernet and RS-485 field panels |
+| **TCP 3001 / 3002** | the **AEM** device's two serial channels (§4.2 sources this independently), and support for Ethernet and RS-485 field panels |
 | **TCP 999** | **Telnet**, the configuration port of an AEM200 |
 | **TCP 100** | retrieves the **list of programs running at the field panel** |
 | **TCP 135** | RPC endpoint mapper; panel diagnostics |
@@ -1074,6 +1074,20 @@ corpus has never looked at: [D]
 | **TCP 502** | Modbus TCP, via the Modbus driver |
 | **TCP 5441** | **a Siemens tool called "Sniffer" that monitors panel traffic** |
 | **TCP 5442** | **IPSNIFF** — used by the Insight Async service to talk to field panels |
+| **TCP 6775 / 6778 / 6779 / 6780** | *"connectivity directly to an **AEM** device"*, to be allowed at the field panels **and** at the host running the ALN |
+| **TCP/UDP 5093**, **TCP 5099** | **not panel ports.** *"APOGEE license authentication"* against the Rainbow/SentinelLM licence manager, to be allowed on the machine designated as License Manager — typically the Insight database server |
+| **TCP 7 / 69** | Ping/ICMP class, Insight **server-to-client** verification rather than anything panel-facing |
+
+> **How much of this row-to-port mapping to trust.** The source is a single
+> table in a vendor white paper, and in that table the port column and the
+> comment column are **vertically offset** — the ports run 7, 69, 100, 135,
+> 161, 162, 502, 3001, 3002, 5033, 5093, 5099, 5441, 5442, 6775, 6778, 6779,
+> 6780 down one side while twelve comments run down the other, so a naive
+> reading pairs them off by one. Three rows name their own port in the
+> comment text (`5033`, `5093`, `5099`) and those are certain; `5441` is
+> confirmed by the separate document it names; `3001`/`3002` is confirmed
+> independently by §4.2. **The rest, including the AEM assignment of
+> 6775-6780, rests on the alignment alone.** [D] **[OPEN]**
 
 Two of those deserve naming. **TCP 5441 carries a vendor tool whose stated
 purpose is monitoring panel traffic**, and the white paper points at a separate
