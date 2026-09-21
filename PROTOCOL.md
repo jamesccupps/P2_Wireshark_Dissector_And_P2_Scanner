@@ -6970,6 +6970,40 @@ operation does, and `TEC_Log` is the one matching the request already paired to
 this opcode. Searching the whole 1,365-structure catalog found nothing else that
 consumes a body exactly. [S][W]
 
+#### 10.9.1 The opcodes with no declared structure, and why most cannot be paired
+
+Twenty-nine opcode/direction pairs in the body cache have **no structure at
+all** — the name-matching rule finds none and none was added by hand. Trying
+every structure in the full 1,365-entry catalog against each and counting the
+survivors says which of those are gaps in the catalog and which are gaps in the
+method: [W][S]
+
+| outcome | pairs | what it means |
+|---|---:|---|
+| nothing fits any structure | 2 | `0x0368` and `0x0C44` requests. A genuinely undeclared shape |
+| exactly one structure fits | 2 | `0x464E` and `0x4650` responses, both `Pdl_display_data` — **one body each**, and the name does not belong to the EBLN family. Treat as coincidence until a second body exists |
+| a tie of 2–44 | 9 | the bodies are too short or too uniform to discriminate |
+| a tie of 100+ | 16 | likewise, and hopelessly so: a 4-byte body is consumed whole by 536 structures |
+
+**The method needs long, varied bodies.** It identified `0x4200`'s response
+because 242 bodies of 72–143 bytes admitted exactly one shape. It cannot
+identify a 12-byte one, and saying so is more useful than another search.
+
+**And thirteen of the twenty-nine are not protocol evidence at all.** Every
+request among `0x0510`, `0x4641`–`0x4643`, `0x4647` and `0x464A`–`0x4650`
+carries the **identical twelve bytes**, which walk cleanly as a bare
+`User_profile` — the same argument that paired `0x0050`'s request. It does not
+transfer, because **every one of those requests was emitted by this project's
+own two research hosts**, one or two frames each, during a blind opcode sweep.
+The twelve identical bytes are our prober's preamble, not the protocol's
+request shape. `0x0050`'s pairing stands on 166 requests from mixed sources;
+these stand on nothing. Attribute by source before reading a shape off the wire
+(§7.1). [W]
+
+`0x4633 EBLN_REPL_NOTIFY` needs no structure: its forty vendor-emitted requests
+all carry a **zero-length body**, which §9 already lists among the 220
+parameterless requests. The single twelve-byte one is ours. [W]
+
 **The table of blockers is empty, and that is the claim: every operation in the
 catalog that declares a request or a response can be turned into named fields
 from this document alone.** The register read 274 in its first edition and 384 in

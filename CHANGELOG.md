@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### `PROTOCOL.md` §10.9.1 — the opcodes with no declared structure
+
+Twenty-nine opcode/direction pairs in the corpus have no structure at all.
+Trying every one of the 1,365 catalog structures against each, and counting the
+survivors, separates a gap in the catalog from a gap in the method: two fit
+nothing, two fit exactly one structure, and twenty-five are ties of up to
+**536** because a four-byte body is consumed whole by almost anything.
+
+**Thirteen of the twenty-nine are not protocol evidence at all.** Every request
+among `0x0510`, `0x4641`–`0x4643`, `0x4647` and `0x464A`–`0x4650` carries the
+*identical twelve bytes*, which walk cleanly as a bare `User_profile` — the same
+argument that paired `0x0050`'s request. It does not transfer: **every one of
+those requests came from this project's own two research hosts**, one or two
+frames each, during a blind opcode sweep. The twelve identical bytes are our
+prober's preamble. `0x0050` stands on 166 requests from mixed sources; these
+stand on nothing.
+
 ### `0x4200`'s response can be decoded now — it always could
 
 The structure catalog maps an opcode to a structure by name, and `0x4200` is
