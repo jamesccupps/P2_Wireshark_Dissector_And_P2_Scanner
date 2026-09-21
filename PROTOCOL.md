@@ -1016,6 +1016,44 @@ Native P2 over IP runs on **TCP**. Every BLN member — the supervisor and every
 
 The 8-slot model means a panel can be told to listen on an alternate port (e.g. to deconflict with a co-resident supervisor product on the same host, which is the origin of the site-specific TCP/5034 second listener); slot 1 always defaults to 5033 and is the canonical port. A client should default to 5033 and treat any other value as site configuration. See §2.1.5 for why the `|PORT` suffix that appears inside identity strings (e.g. `NODE1|5034`) is part of the *identity string* and is **not** a live port indicator — the same suffixed identity rides whichever TCP port actually carried the frame [W].
 
+##### The one documented exception to BLN-wide port uniformity
+
+The uniformity rule above holds for hardware panels, and the vendor's own
+configuration help states the exception: a **Soft Controller** — a virtual
+field panel running as a Windows service on a workstation — is
+identified on the BLN by a **port number rather than by a node identifier**.
+The help is explicit that these are alternative identification schemes: a
+hardware Ethernet panel is defined by a *Node Identifier*, and a Soft
+Controller by a *Port Number*. [D]
+
+| Property | Value |
+|---|---|
+| Soft Controller default port | **TCP/5400** |
+| Recommended range | **5100 – 32767**, on the stated grounds that lower numbers are assigned to other services |
+| Hard constraint | must differ from the BLN's Transport Server Port (5033) |
+| Collision rule | two Soft Controllers on one workstation may not use ports differing by exactly **100** — 5400 excludes 5300 and 5500, while 5401 is permitted |
+
+The reason is structural rather than arbitrary. Several Soft Controllers share
+one workstation's IP address, so the `(IP, 5033)` pair that distinguishes
+hardware panels cannot distinguish them; the port carries the identity instead,
+which is why their identity string is `SITE:HOST|PORT` rather than a node name
+(§3.3.1). [D][I]
+
+**For an implementer this is a discovery consideration, not a framing one.**
+The frame format is unchanged; what changes is that scanning only 5033 finds
+hardware panels and misses every Soft Controller on the BLN. The ±100
+exclusion is the clearest external evidence that a Soft Controller occupies a
+*second* port at a fixed offset — §3.3.1 reaches the same conclusion from the
+constraint alone. **[OPEN]** — no Soft Controller has been observed
+on the wire here, so the second port's purpose is inferred, not seen.
+
+Two further configuration facts from the same source, both operational rather
+than protocol: the Transport Server Port is set in a **LocalNet Configuration
+Utility** rather than per panel, and **changing a panel's detected DNS suffix
+coldstarts it** — a configuration edit with a service interruption behind it.
+A node identifier is additionally barred from containing **periods or
+punctuation**, alongside the 15-character limit already recorded in §5.3. [D]
+
 #### 4.1.1 The rest of the port surface a panel presents
 
 5033 is where P2 lives, and it is not the only thing a field panel answers on.
@@ -1052,7 +1090,7 @@ tool. [D][I]
 
 **The 5034 listener and the two-connection pattern.** In the observed Desigo deployment, 5034 is not merely a "site-specific second port" — it is the **supervisor-side inbound listener for the reverse (panel→supervisor) channel**: field panels listen on 5033 for the supervisor's poll/command channel, while the supervisor listens on 5034 for node-originated push/value traffic and node announcements. Each node-pair therefore maintains (at least) two TCP connections — supervisor→panel:5033 and panel→supervisor:5034 — one opened in each direction (§7.3). The exact supervisor port assignment is deployment-specific (it can equally be 5033, and the 8-slot model permits other values), but the **two-listener / two-connection model is the structural pattern**, independent of the specific port numbers. [W]
 
-#### 4.1.1 Surrounding observable service footprint
+#### 4.1.2 Surrounding observable service footprint
 
 A P2/IP panel is a small embedded host that exposes platform services around the P2 port. These are **not P2** and carry no P2 frames; they are listed only as the observable footprint of a real panel, useful for fingerprinting and for understanding what else is on the wire. Only TCP/5033 (and optionally a second supervisor listener) carries P2 itself.
 
