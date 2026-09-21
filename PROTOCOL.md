@@ -316,7 +316,42 @@ The following terms are used consistently throughout (cross-referenced in detail
 
 **In scope:** the P2 wire protocol over TCP/IP and the adjacent layers an implementer must understand to use it — transport and ports, framing and encoding, addressing and identity, the session handshake, the full operation/opcode catalog, the point model, replication/discovery, COV/alarms, error codes, and PPCL-over-the-wire.
 
-**Out of scope:** the BACnet protocol stack (BACnet/IP and BACnet MSTP) that coexists on later panels; the serial-era physical layer except as lineage context (§1.5); and any management-station-internal supervisor-to-station RPC that does not appear on the panel wire. [I]
+**Out of scope:** the BACnet protocol stack (BACnet/IP and BACnet MSTP) that coexists on later panels; the serial-era physical layer except as lineage context (§1.5); any management-station-internal supervisor-to-station RPC that does not appear on the panel wire; and — for reasons of consequence rather than difficulty — **the life-safety network described immediately below**. [I]
+
+#### 1.2.1 The life-safety network, and why nothing here goes near it
+
+The same management station that speaks this protocol to HVAC field panels
+also integrates **fire alarm panels**, on a network the vendor calls a **Life
+Safety BLN**. Its members are a different product family — `ALS3` panels
+described as *"field panel that belongs to an integrated Fire network"*, and
+`MXL` / `FireFinder XLS` backbones — reached through the station's ordinary
+device tree, and the station's own operator documentation exposes **Reset** and
+**Alarm Silence** as panel commands, the latter gated by a programmable
+*Alarm Silence Inhibit* timer. Alarm acknowledgement can be owned by a
+designated workstation ("Proprietary") or unrestricted ("Local"). [D]
+
+**This document describes none of it, and the tooling accompanying it must
+never address it.** The reason is not that the mechanism is uninteresting.
+It is that the consequence of a mistake is not a comfort complaint:
+
+- A read that a panel mishandles is a nuisance on an air handler and a
+  life-safety event on a fire panel.
+- `Alarm Silence` and `Reset` are **suppression** operations. A tool that can
+  reach them can quiet a real alarm, and no amount of read-only discipline
+  elsewhere in a scanner makes that acceptable.
+- Fire systems carry listing and approval obligations that a third-party tool
+  touching the network can void, independently of whether it causes a fault.
+
+It is recorded here **because an owner needs to know it**, not so that anyone
+can act on it. A building operator evaluating what a compromised management
+station is worth to an attacker should know that the answer includes the fire
+panels, and that the blast radius of supervisor compromise is not bounded by
+HVAC. That is a defensive fact and it changes how the station itself should be
+segmented and monitored. [D][I]
+
+No opcode, command encoding, body layout or addressing for any life-safety
+operation appears anywhere in this document, and none will be added. **[OPEN]
+by choice, permanently.**
 
 ### 1.5 Lineage (informative)
 
