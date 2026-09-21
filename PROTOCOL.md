@@ -1138,7 +1138,7 @@ Beneath each panel sits the Field Level Network (FLN), running **P1 (Powers Prot
 |---|---|---|
 | Medium | 2-wire differential RS-485 ("FLN TRUNK", labeled `+ / − / Shield`), with a per-controller communication-status LED (`BST`) | [D] |
 | Capacity per trunk | ≤ 32 devices, drop addresses **0–31** | [D] |
-| Trunks per panel | 3 P1 FLN trunks per APOGEE panel (4 on NCRS-class) | [D] |
+| Trunks per panel | 3 P1 FLN trunks per APOGEE panel (4 on NCRS-class), carried on **LAN numbers 1-3** | [D][S] |
 | Device identity | drop number + application number (see §5.5) | [D] |
 | Discovery transaction | **P1WhoAreYou** (see §5.5); a mismatch yields a `Failed P1WhoAreYou` error | [D] |
 | Auto-discover baud | default 1200 baud | [D] |
@@ -1147,6 +1147,38 @@ Beneath each panel sits the Field Level Network (FLN), running **P1 (Powers Prot
 On a modular panel the RS-485 FLN trunks are provided either by built-in ports or by an add-on **RS-485 FLN expansion module** — Siemens' `PXX-485.3` carries "three RS-485 P1 FLN connections OR one MS/TP FLN connection" per the public *PXC Modular Series* datasheet. This module sits on the panel's downstream (field) bus and is wholly separate from the upstream ALN/supervisor link that carries P2 — it has no bearing on the P2 wire framing (§6.2). [D]
 
 A panel may alternatively host a BACnet MS/TP fieldbus in place of P1 (`Fln_type_enum`: `P1` = 0, `MSTP` = 1) [S]. Which one is available tracks the panel's **firmware track**, not the hardware: proprietary-P2/APOGEE firmware (the subject of this spec) drives a **P1 FLN only**, while the separate BACnet firmware build of the same hardware adds the MS/TP option. MS/TP is a different protocol stack and is out of scope for this P2 specification; only the P1/FLN bus is treated here. [D]
+
+##### LAN numbering, and what occupies LAN 0
+
+A panel's fieldbus layout is declared in its own capability document as a
+repeated `<FLN LAN="n">TYPE</FLN>` element (§16.4.1). Across 55 stored panel
+manifests only four layouts occur:
+
+| layout | panels |
+|---|---:|
+| `LAN0=ISLANDBUS  LAN1=P1  LAN2=P1  LAN3=P1` | 44 |
+| `LAN0=ISLANDBUS  LAN1=MSTP` | 5 |
+| `LAN1=P1` only | 2 |
+| `LAN1=MSTP` only | 2 |
+
+Three consequences, and the first is the one that bites an implementer:
+
+1. **The P1 FLN trunks are LAN numbers 1, 2 and 3 — not 0, 1 and 2.** LAN 0 is
+   the panel's **TX-I/O island bus**, which is a module backplane rather than a
+   field trunk, and it is present under either fieldbus configuration. A client
+   that assumes zero-based trunk numbering is off by one on every FLN address.
+   This is confirmed on the wire: the `lan` field of `0x0986 UPL_ALL_TEC` and
+   `0x0976` carries **983 observations across seventeen captures**, values
+   **1 (723), 2 (204), 3 (56)** and **never 0**. [W][S]
+2. **No panel mixes P1 and MS/TP.** An MS/TP panel carries exactly one fieldbus
+   LAN; a P1 panel carries three. This is the observed form of the `PXX-485.3`
+   line quoted above — three P1 connections *or* one MS/TP — and it makes "in
+   place of P1" an observation rather than a documentation claim. [S]
+3. **`ISLANDBUS` is not known to be an `Fln_type_enum` member.** It appears as
+   a type *name* in the capability document; the enum above is the fieldbus
+   type and carries `P1` and `MSTP`. Whether the island bus has an enum value,
+   and what `FLN_lan_number` = 0 means to a panel that is asked for it, are
+   untested here. **[OPEN]**
 
 #### 4.4.1 The P1 datalink, from the equipment vendors who have to publish it
 
@@ -10074,6 +10106,37 @@ capture: [S]
 as an open set rather than expect exactly the three elements above. A panel
 that does not implement the operation answers with a refusal naming itself
 rather than an empty document.
+
+**The open-set warning is now a measurement, not a caution.** Fifty-five real
+instances of this document were recovered from stored panel databases, and they
+carry **eighteen** distinct `<Services>` elements rather than three. In
+descending order of how many panels declare each: `FLNTopology` (55),
+`OperatorActivityLogging`, `AlarmBuffer`, `LicenseManager`, `RENO`, `TXIO`,
+`usbTool` (53 each), `usbModem`, `usbPrinter` (49), `TrendDST` (47),
+`WirelessFLN` (44), `Adapt` (43), `BACnetIPALN`, `FPWebFINBuilderCOV`,
+`FPWebFINBuilderPublish`, `SNMP` (12 each), `FPWeb` (9), `MB` (2). [S]
+
+Two further points an implementer needs:
+
+- **`<PanelBasics>` carries `<Platform>` and `<VersionNumber>`** beyond the
+  template above. Observed `HardwareType` values are `PXME`, `EPXC`, `MECF`,
+  `MCFP`; observed `Platform` values are `PME`, `PXE`, `MCF`, `MCA`. [S]
+- **`<Services>` carries a repeated `<FLN LAN="n">TYPE</FLN>` element** that
+  the template does not show. It declares the fieldbus type *per LAN number*
+  and is the clearest statement of a panel's fieldbus layout the protocol
+  offers — see §4.4, which it settles. [S]
+
+Elements carrying no `Enabled` attribute are presence-only. Of those that do,
+every observed value was `NO` except **`FPWeb=YES` on nine panels** — an
+independent confirmation of the HTTP service in §4.1.1's port surface, stated
+by the panel about itself. [S]
+
+This content comes from stored panel databases, not from a capture. The
+statement above that neither opcode appears in the corpus was re-verified
+across all 229 captures, including the panel-side captures: zero occurrences of
+`ServicesRendered` or `PanelBasics`. An implementer still has **no
+wire-observed example of the response framing**; what is established is the
+content a real panel puts in it. **[OPEN]** [S]
 
 Two things follow for an implementer. First, this is a **richer identity read
 than `0x010C`** — it adds hardware type, platform, build number and a
