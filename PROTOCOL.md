@@ -2538,11 +2538,32 @@ Two members do not fit, and are reported rather than smoothed over:
 and `port_not_found` = **0** in the three RACS port enums. The global catalog
 defines no code 0 — its memory error is `0x0001` and its not-found is `0x0003`.
 Both are the first-declared member of their enum, which would suggest a generator
-default, except that `AP2_Racs_Partner_Delete_Error_enum` has exactly one member
-and it is `partner_not_found` = 3, so the first member is not auto-zeroed. Either
-0 is a real code the catalog omits, or those five enums number from a different
-base. That is a narrow open item: it affects five RACS operations and no code
-this corpus has seen. [S][OPEN]
+default.
+
+**Two readings can now be ruled out, and a third observation replaces them.**
+Reading every one of the sixteen out of the vendor's enum dump rather than the
+two that had been looked at: [S]
+
+| enums | members |
+|---|---|
+| eleven partner enums (`Delete`, `Display`, `Log`, `Look`, `Enable`, `Disable`, `StatLog`, `StatLog_Reset`, `Upl_All`, `Upl_Added`, …) | a single member, `partner_not_found` = **3** |
+| three port enums (`Port_Look`, `Port_StatLog`, `Port_StatLog_Reset`) | a single member, `port_not_found` = **0** |
+| `Racs_Partner_Add` | `no_ram_available` = **0**, `invalid_partner_number` = 2, `partner_already_here` = 9 |
+| `Racs_Partner_Modify` | `no_ram` = **0**, `invalid_partner_number` = 2, `partner_not_found` = 3 |
+
+- **Not a generator default.** `partner_not_found` = 3 is the *sole* member of
+  eleven separate enums, so a first-declared member is plainly not auto-zeroed.
+  The earlier edition made this point from one enum; it holds across eleven.
+- **Not a different numbering base.** In the only two enums with more than one
+  member, every non-zero member is the global code *verbatim* — 2 is
+  `invalid_command`, 3 is `not_found`, 9 is `already_exists`. A base offset
+  would shift those, and it does not.
+
+What is left is sharper and stranger than "0 is a code the catalog omits":
+**the same concept takes two values in the same type system.** "Not found" is
+**3** for a partner and **0** for a port, in enums that sit side by side. So
+whatever the 0 means, it is not a global code used consistently. It affects
+five RACS operations and no code this corpus has seen. [S][OPEN]
 
 #### 7.2.3 Implementation guidance
 
