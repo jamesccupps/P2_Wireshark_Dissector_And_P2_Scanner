@@ -3274,7 +3274,24 @@ On the wire this serializes as the sub-structure's fields, then the name TLV(s),
 | `l2sl` | 13 | 13 |
 | `lenum` | 7 | 7 |
 
-**Seven of the sixteen arms are exercised; the other nine stay `[OPEN]`** — `looap`, `l2sp`, `looal`, `lfssl`, `lfssp`, `ldao`, `lfmsl`, `lfmsp`, `ppcl_lai`. An earlier edition said ten and listed `lpaci` among them; that was true of the 60-body sample and false of the corpus, which carries **two** `lpaci` bodies (§1.4.1.1). Walking all 444,961 bodies gives the arm counts as `lao` 13,499, `ldo` 5,068, `lai` 3,909, `ldi` 1,318, `lenum` 421, `l2sl` 146, **`lpaci` 2**. [W] That is the same ceiling §10.9 describes: this site runs six point types, and no amount of further reading of this capture set will produce a seventh. [W][OPEN] For the replication change-record framing the interior offsets remain **[OPEN]**; treat byte-offset claims there as inferred.
+**Seven of the sixteen arms are exercised.** An earlier edition said ten and listed `lpaci` among them; that was true of the 60-body sample and false of the corpus, which carries **two** `lpaci` bodies (§1.4.1.1). Walking all 444,961 bodies gives the arm counts as `lao` 13,499, `ldo` 5,068, `lai` 3,909, `ldi` 1,318, `lenum` 421, `l2sl` 146, **`lpaci` 2**. [W] That is the same ceiling §10.9 describes: this site runs six point types, and no amount of further reading of this capture set will produce a seventh. [W]
+
+**Of the nine unexercised arms, two need no wire confirmation and seven do.** Resolving each arm to the structure it actually reaches, rather than counting arm names: [S]
+
+| arm | reaches | why it is, or is not, still open |
+|---|---|---|
+| `ppcl_lai` | `LAI_type` | **the same structure as `lai`**, which 112 bodies consume to the byte. A program-resident calculated value carries the analog arm unchanged, so its interior is confirmed — by those bodies |
+| `ldao` | `LDAO_type` | **declared empty.** The arm consumes zero bytes; there is no interior to mis-offset |
+| `looap`, `looal` | `LOOAP_type` (5), `LOOAL_type` (4) | genuinely unconfirmed |
+| `lfssl`, `lfssp` | `LFSSL_type` (4), `LFSSP_type` (5) | genuinely unconfirmed |
+| `l2sp` | `L2SP_type` (4) | genuinely unconfirmed |
+| `lfmsl`, `lfmsp` | `LFMSSL_type` (8), `LFMSSP_type` (9) | genuinely unconfirmed |
+
+**Seven arms therefore remain unconfirmed on the wire, not nine.** [S][OPEN]
+
+Worth reading against §11.7: **four of the seven — `looap`, `looal`, `lfssl`, `lfssp` — are exactly the point types that carry more than two states** (OFF/ON/AUTO and STOP/SLOW/FAST). The same types are absent from the FLN application catalog's 181,170 points and from every panel-resident record. They are not rare here; they are **absent**, and a reader whose site runs them is reading this section's least-supported claims. [W][S]
+
+For the replication change-record framing the interior offsets remain **[OPEN]**; treat byte-offset claims there as inferred.
 
 For the byte-level grammar of each opcode's request and response ASDU, see §9; for the point-model structures (value blocks, multistate enum tables, FLN-device subpoints, slope/intercept scaling) these primitives compose into, see §11.
 ## 9. Function-Code (Opcode) Catalog
