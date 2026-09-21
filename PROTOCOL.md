@@ -3469,6 +3469,19 @@ descriptive (`__RpcRegisterCOVxx`, `__RpcCancelCOVxx`, `__RpcColdStartCabinet`,
 tier the most legible statement of *what operations exist* that this protocol
 has. [S]
 
+**This vocabulary is stable across supervisor versions.** The counts above were
+first measured on a single build. Comparing four build generations of the two
+adapter libraries — 2014, 2017, a 2018 patch level, and a 2019 build of a
+different product — the declared command set is identical at every step, by set
+comparison and not merely by count: no operation is added and none is removed.
+One library declares 353 request adaptors (188 request-only, 165
+request-response) and 377 operation classes in all four; the other declares 349
+and 345. An implementer may therefore treat the operation vocabulary of §9.1 as
+fixed for supervisors of this era, rather than as a property of one version.
+[S] What this does *not* fix is which operations a given panel firmware
+answers — that is a separate question, addressed in §10.9, and a supervisor
+knowing how to ask is not evidence that a panel implements. [I]
+
 **The receive path is narrower than the send path, and by how much is
 measurable.** `BLN2CPI` dispatches an inbound frame through a chain of **twelve
 range switches**, each of which states its own first opcode and its own length.
