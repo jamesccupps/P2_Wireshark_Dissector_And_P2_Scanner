@@ -145,3 +145,42 @@ def test_an_unknown_opcode_gets_not_found_not_a_fake_success(panel):
         f"unknown opcode answered with direction 0x{direction:02X}; "
         "a synthetic success is how an unimplemented operation looks done")
     assert panel.unknown_opcodes.get(0xBEEF) == 1
+
+
+# ------------------------------------------------- 0x010D capability document
+
+def test_services_rendered_returns_the_capability_document(panel):
+    """0x010D AP2_SERVICES_RENDERED answers with an XML capability document.
+
+    Content is modelled on 55 real documents recovered from stored panel
+    databases (PROTOCOL.md 16.4.1); the framing is inferred, because this
+    exchange appears in none of the 229 captures in the corpus.
+    """
+    resp = _ask(panel, _correct_msg_type(panel), opcode=0x010D)
+    assert resp, "panel did not answer 0x010D"
+    assert b"<ServicesRendered>" in resp
+    assert b"<PanelBasics>" in resp
+    assert panel.node.encode() in resp
+
+
+def test_services_rendered_declares_island_bus_on_lan_zero(panel):
+    """LAN 0 is the TX-I/O island bus; the P1 trunks are LANs 1-3.
+
+    This is the off-by-one a client walking FLN addresses will hit if it
+    assumes zero-based trunk numbering, and the wire corpus agrees: the `lan`
+    field carries 1, 2 and 3 across 983 observations and never 0.
+    """
+    resp = _ask(panel, _correct_msg_type(panel), opcode=0x010D)
+    assert b'<FLN LAN="0">ISLANDBUS</FLN>' in resp
+    for lan in (1, 2, 3):
+        assert ('<FLN LAN="%d">P1</FLN>' % lan).encode() in resp
+    assert b'<FLN LAN="0">P1</FLN>' not in resp
+
+
+def test_services_rendered_carries_more_than_the_vendor_template(panel):
+    """The vendor template shows three <Services> elements; real panels carry
+    eighteen. A client must parse an open set."""
+    resp = _ask(panel, _correct_msg_type(panel), opcode=0x010D)
+    for el in (b"OperatorActivityLogging", b"AlarmBuffer", b"FLNTopology",
+               b"LicenseManager", b"TXIO", b"TrendDST", b"Adapt", b"usbTool"):
+        assert el in resp, "missing <Services> element %r" % el

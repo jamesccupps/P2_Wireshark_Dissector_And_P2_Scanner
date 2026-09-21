@@ -268,6 +268,10 @@ def check_level2(panel):
            "no EBLN replication at all")
     report("level2", "Serve COV subscriptions", PARTIAL,
            "pushes 0x0274 after a write; no subscribe/unsubscribe state")
+    report("level2", "0x010D capability document", PARTIAL,
+           "content from 55 real documents; FRAMING IS INFERRED -- the "
+           "exchange is in none of the 229 captures, so the body wrapper is a "
+           "guess and stays PARTIAL until one is captured")
     # Measured, not assumed: three requests in one segment, count the answers.
     payload_of = lambda op: (
         b"\x00" + panel.bln.encode() + b"\x00" + panel.node.lower().encode()

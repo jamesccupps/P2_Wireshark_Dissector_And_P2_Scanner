@@ -106,6 +106,7 @@ OP_READ_SHORT          = 0x0220
 OP_WRITE_QUALITY       = 0x0240
 OP_PROPERTY_READ_PATH  = 0x0294
 OP_VALUE_PUSH          = 0x0274
+OP_SERVICES_RENDERED   = 0x010D
 OP_PANEL_STATE         = 0x0368
 OP_ENUM_POINTS         = 0x0981
 OP_ENUMERATE_FLN       = 0x0986
@@ -166,6 +167,47 @@ def _build_routing(bln: str, dest: str, scanner: str) -> bytes:
             + scanner.encode('ascii') + b'\x00')
 
 
+# The capability document a panel returns for 0x010D.  Element set and order
+# follow the 55 real documents recovered from stored panel databases; see
+# PROTOCOL.md 16.4.1.  LAN 0 is the TX-I/O island bus and the P1 trunks are
+# LANs 1-3 (4.4) -- a client that assumes zero-based trunk numbering is off by
+# one on every FLN address, which is exactly the kind of defect this fixture
+# exists to surface.
+_SERVICES_RENDERED_TEMPLATE = """<?xml version="1.0" encoding="ASCII" standalone="yes"?>
+<ServicesRendered>
+<Panel Name="%s">
+<PanelBasics>
+<ID_STRING>%s</ID_STRING>
+<RevString>%s</RevString>
+<LinkDate>%s</LinkDate>
+<HardwareType>%s</HardwareType>
+<BuildNumber>%s</BuildNumber>
+<Platform>%s</Platform>
+<VersionNumber>%s</VersionNumber>
+</PanelBasics>
+<Services>
+<OperatorActivityLogging Enabled="NO" />
+<AlarmBuffer Enabled="NO" />
+<FLNTopology />
+<LicenseManager />
+<RENO Enabled="NO" />
+<TXIO />
+<TrendDST />
+<WirelessFLN Enabled="NO" />
+<Adapt />
+<FLN LAN="0">ISLANDBUS</FLN>
+<FLN LAN="1">P1</FLN>
+<FLN LAN="2">P1</FLN>
+<FLN LAN="3">P1</FLN>
+<usbModem />
+<usbPrinter />
+<usbTool />
+</Services>
+</Panel>
+</ServicesRendered>
+"""
+
+
 def _tlv(value: bytes | str) -> bytes:
     """`01 [u16 BE length] [value]` per PROTOCOL.md §8.1."""
     if isinstance(value, str):
@@ -224,6 +266,13 @@ class VirtualPxc:
         firmware_build: str = "PME1252",
         hardware_platform: str = "PXME V2.8.10 APOGEE",
         build_date: str = "Oct 28 2013 12:31:01",
+        # identity fields carried only by the 0x010D capability document.
+        # Defaults are the most common values across the real set:
+        # HardwareType PXME (48 of 55), Platform PME (49 of 55).
+        services_id_string: str = "000000P00000XXX00-X00.X",
+        hardware_type: str = "PXME",
+        build_number: str = "3150",
+        version_number: str = "V2.8.10",
         host: str = "127.0.0.1",
         port: int = 0,
         cov_push_enabled: bool = True,
@@ -236,6 +285,10 @@ class VirtualPxc:
         self.firmware_build = firmware_build
         self.hardware_platform = hardware_platform
         self.build_date = build_date
+        self.services_id_string = services_id_string
+        self.hardware_type = hardware_type
+        self.build_number = build_number
+        self.version_number = version_number
         self.host = host
         self._requested_port = port
         self.port: int = 0  # filled in by start()
@@ -540,6 +593,7 @@ class VirtualPxc:
             OP_IDENTIFY_BLOCK:      self._handle_handshake,
             OP_SYSTEM_INFO_COMPACT: self._handle_sysinfo_compact,
             OP_SYSTEM_INFO_LEGACY:  self._handle_sysinfo_legacy,
+            OP_SERVICES_RENDERED:   self._handle_services_rendered,
             OP_STATUS_QUERY:        self._handle_status_query,
             OP_READ_LEGACY:         self._handle_read,
             OP_READ_SHORT:          self._handle_read,
@@ -692,6 +746,34 @@ class VirtualPxc:
                                 scanner: str, body: bytes) -> bytes:
         """0x0100 — legacy SystemInfo, used as mid-session EPing response."""
         return self._handle_sysinfo_compact(msg_type, seq, scanner, body)
+
+    def _handle_services_rendered(self, msg_type: int, seq: int,
+                                   scanner: str, body: bytes) -> bytes:
+        """0x010D AP2_SERVICES_RENDERED — the panel's capability document.
+
+        **The CONTENT is modelled on 55 real documents; the FRAMING is
+        inferred.** Those 55 were recovered from stored panel databases, not
+        from a capture: this exchange appears in none of the 229 captures in
+        the corpus, so no example of how the response body is wrapped exists.
+        The document is emitted here as a single string TLV (§8.1), which is
+        how this panel emits every other string — a guess, and the most likely
+        one, but a guess.
+
+        A client MUST NOT treat this framing as specified. `verify.py` reports
+        this row as PARTIAL for exactly that reason, and it stays PARTIAL until
+        somebody captures a real `0x010D` exchange. What *is* faithful is the
+        element vocabulary: `<Services>` carries eighteen distinct elements
+        across the real set rather than the three the vendor template shows,
+        `<PanelBasics>` carries `<Platform>` and `<VersionNumber>`, and the
+        fieldbus layout appears as repeated `<FLN LAN="n">` elements in which
+        **LAN 0 is the TX-I/O island bus and the P1 trunks are LANs 1-3**
+        (PROTOCOL.md §4.4).
+        """
+        doc = _SERVICES_RENDERED_TEMPLATE % (
+            self.node, self.services_id_string, self.firmware_build,
+            self.build_date, self.hardware_type, self.build_number,
+            self.hardware_platform, self.version_number)
+        return self._build_response(msg_type, seq, scanner, _tlv(doc))
 
     def _handle_status_query(self, msg_type: int, seq: int,
                               scanner: str, body: bytes) -> bytes:
