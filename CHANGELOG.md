@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### `0x4200`'s response can be decoded now — it always could
+
+The structure catalog maps an opcode to a structure by name, and `0x4200` is
+`AP2_CONTROLLER_LOG` in the opcode enum while its bodies are `AP2_TEC_Log_*` in
+the structure library, so the two never meet. The **request** was paired by hand
+on wire evidence. The **response** was refused, because `AP2_TEC_Log_Response`
+*"truncates on all 242 response bodies, so the declared structure is longer than
+anything on the wire"*.
+
+**Truncation is not misfit.** It means the body ended at a *field boundary*,
+which is the normal shape of a short response. Re-derived over all **242** bodies
+in the corpus rather than the 60-body cache: **every byte of every one is
+consumed**, no error, no leftover, and all 242 stop at the same field,
+`tec_body.nrOfrechar_values`. The panel sends the TEC record without its trailing
+recharacterization array and BACnet flag.
+
+So the pairing is added, and the shipped catalog gains the structure it was
+pruning as unreachable. 1,020 → 1,021 structures; 242 response bodies that
+previously answered *"no structure is declared"* now decode.
+
+The honest limit, carried in the document and in a test: **five library
+structures declare this shape field-for-field**, so identifying the bytes does
+not identify the name. The operation does.
+
+
 ### A CHOICE read as a fixed width, and a declared field that went missing
 
 `p2_asdu` carries a `WIDTHS` entry for two types that are also CHOICEs, and

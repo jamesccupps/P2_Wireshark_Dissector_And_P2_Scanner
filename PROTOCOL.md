@@ -6927,10 +6927,27 @@ reach were added on wire evidence: `0x4200`, whose opcode is named
 `AP2_CONTROLLER_LOG` while its request body is `AP2_TEC_Log_Request` — 247 of
 248 bodies decode cleanly under it and **no other library structure closes even
 one** — and `0x0050 AP2_DISK_LOG`, whose request is a bare `User_profile`
-rather than any `AP2_*_Request` at all. `0x4200`'s *response* was not added:
-`AP2_TEC_Log_Response` truncates on all 242 response bodies, so the declared
-structure is longer than anything on the wire and the pairing stays
-**[OPEN]**. [W]
+rather than any `AP2_*_Request` at all.
+
+**`0x4200`'s response is now paired too, and the reason it was not is worth
+keeping.** An earlier edition refused it because `AP2_TEC_Log_Response`
+"truncates on all 242 response bodies, so the declared structure is longer than
+anything on the wire". **Truncation is not misfit.** It means the body ended at
+a *field boundary*, which is the normal shape of a short response — and over all
+242 bodies in the corpus **every byte of every one is consumed**, with no error
+and no leftover, every one stopping at the same field: `tec_body.nrOfrechar_values`.
+The panel sends the TEC record without its trailing recharacterization array and
+BACnet flag. That is a short record, not a wrong structure, and refusing the
+pairing left the shipped catalog unable to decode the response at all. [W]
+
+The honest limit: **five library structures declare this shape field-for-field**
+— `AP2_TEC_Log_Response`, `AP2_TEC_Look_Response`,
+`AP2_TEC_Query_Record_Response`, `AP2_TEC_Definition_Response` and
+`AP2_Upl_All_TEC_Response`, all `{ team_response : Team_response, tec_body :
+TEC_body }`. Identifying the bytes therefore does not identify the *name*; the
+operation does, and `TEC_Log` is the one matching the request already paired to
+this opcode. Searching the whole 1,365-structure catalog found nothing else that
+consumes a body exactly. [S][W]
 
 **The table of blockers is empty, and that is the claim: every operation in the
 catalog that declares a request or a response can be turned into named fields
