@@ -15,6 +15,10 @@ import pytest
 
 import analyze_pcap as ap
 
+# Documentation addresses, as everywhere else in this repository.
+PEER = "192.168.1.50"
+PANEL = "192.168.1.10"
+
 SLOTS = ("SITEBLN", "SUPERVISOR", "SITEBLN", "NODE1")
 OP_DBCHANGE_POINT = 0x0951
 OP_EBLN_PING = 0x4640
@@ -52,7 +56,7 @@ def clean_state():
     yield
 
 
-def feed(*segments, src="10.0.0.9", sport=40000, dst="10.0.0.1", dport=5033,
+def feed(*segments, src=PEER, sport=40000, dst=PANEL, dport=5033,
          stream="1", start=1):
     seq = start
     for s in segments:
@@ -126,17 +130,17 @@ def test_several_frames_in_one_segment_are_all_pulled():
 def test_a_retransmission_is_counted_once():
     """Appending in arrival order would parse the same bytes twice."""
     f = frame()
-    ap.consume_segment(f, "10.0.0.9", 40000, "10.0.0.1", 5033, 1, "1")
-    ap.consume_segment(f, "10.0.0.9", 40000, "10.0.0.1", 5033, 1, "1")
+    ap.consume_segment(f, PEER, 40000, PANEL, 5033, 1, "1")
+    ap.consume_segment(f, PEER, 40000, PANEL, 5033, 1, "1")
     assert ap.opcode_counts[OP_EBLN_PING] == 1
     assert ap.retransmit_bytes[0] == len(f)
 
 
 def test_a_partial_overlap_keeps_only_the_new_tail():
     f = frame() + frame(OP_DBCHANGE_POINT)
-    ap.consume_segment(f[:40], "10.0.0.9", 40000, "10.0.0.1", 5033, 1, "1")
+    ap.consume_segment(f[:40], PEER, 40000, PANEL, 5033, 1, "1")
     # resent from byte 20, carrying 20 bytes already held plus the rest
-    ap.consume_segment(f[20:], "10.0.0.9", 40000, "10.0.0.1", 5033, 21, "1")
+    ap.consume_segment(f[20:], PEER, 40000, PANEL, 5033, 21, "1")
     assert ap.retransmit_bytes[0] == 20
     assert ap.opcode_counts[OP_EBLN_PING] == 1
     assert ap.opcode_counts[OP_DBCHANGE_POINT] == 1
@@ -145,9 +149,9 @@ def test_a_partial_overlap_keeps_only_the_new_tail():
 def test_a_gap_is_counted_and_does_not_misalign_what_follows():
     """Bytes never captured. Carrying the stale prefix would shift everything."""
     f = frame()
-    ap.consume_segment(f[:10], "10.0.0.9", 40000, "10.0.0.1", 5033, 1, "1")
+    ap.consume_segment(f[:10], PEER, 40000, PANEL, 5033, 1, "1")
     # ten bytes placed from offset 1, so the next expected offset is 11
-    ap.consume_segment(f, "10.0.0.9", 40000, "10.0.0.1", 5033, 500, "1")
+    ap.consume_segment(f, PEER, 40000, PANEL, 5033, 500, "1")
     assert ap.gap_bytes[0] == 500 - 11
     assert ap.opcode_counts[OP_EBLN_PING] == 1      # the whole frame, not two
 
@@ -215,7 +219,7 @@ def test_the_two_directions_of_one_connection_stay_separate():
     """Same stream id, opposite four-tuples: two independent byte streams."""
     f = frame()
     feed(f[:10], stream="1")
-    feed(f, src="10.0.0.1", sport=5033, dst="10.0.0.9", dport=40000, stream="1")
+    feed(f, src=PANEL, sport=5033, dst=PEER, dport=40000, stream="1")
     assert ap.opcode_counts[OP_EBLN_PING] == 1
     assert ap.retransmit_bytes[0] == 0
 

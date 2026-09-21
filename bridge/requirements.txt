@@ -7,7 +7,7 @@
 bacpypes3>=0.0.100,<0.1
 
 # Optional — improves the GUI's "Bind interface" dropdown by showing
-# adapter names (e.g. "Ethernet (10.0.0.5)") instead of bare IPs.
+# adapter names (e.g. "Ethernet (192.168.1.10)") instead of bare IPs.
 # Uncomment or install separately:
 #   pip install psutil
 # psutil>=5.9
