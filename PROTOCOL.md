@@ -10331,11 +10331,43 @@ descending order of how many panels declare each: `FLNTopology` (55),
 `WirelessFLN` (44), `Adapt` (43), `BACnetIPALN`, `FPWebFINBuilderCOV`,
 `FPWebFINBuilderPublish`, `SNMP` (12 each), `FPWeb` (9), `MB` (2). [S]
 
+**Confirmed from a second, independent store, and the set is twenty.** The
+eighteen above were recovered from *panel* databases. Thirty-six further
+instances were then read out of the **supervisor's own** backup databases --
+a different file family with a different header -- and **all eighteen appear
+there, none is absent.** Two elements the panel-database sample did not show
+do appear:
+
+```xml
+<HOA SwitchCount="0" />          <!-- Hand/Off/Auto switches present, see 11.3.1 -->
+<OnboardIO PointCount="24" />    <!-- 24 and 16 observed -->
+```
+
+and `<FLN>` carries a **`DROP` attribute** alongside `LAN`, which the template
+below does not show:
+
+```xml
+<FLN LAN="0" DROP="0">ASIC</FLN>
+```
+
+All three travel together and only on **compact** controllers: every block
+carrying one carries all three, and all of them are `PXCE`/`PCE` or
+`EPXC`/`PXE`. A client must treat `<Services>` as the open set this section
+already warns it is -- twenty is a floor, not a total -- and must not assume
+`<FLN>` carries `LAN` alone. [S]
+
 Two further points an implementer needs:
 
 - **`<PanelBasics>` carries `<Platform>` and `<VersionNumber>`** beyond the
   template above. Observed `HardwareType` values are `PXME`, `EPXC`, `MECF`,
-  `MCFP`; observed `Platform` values are `PME`, `PXE`, `MCF`, `MCA`. [S]
+  `MCFP`, **`PXMP`** and **`PXCE`**; observed `Platform` values are `PME`,
+  `PXE`, `MCF`, `MCA`, **`PMP`** and **`PCE`**. The two pair **one to one**
+  across all 31 panels read from the supervisor databases --
+  `PXME`/`PME` (11), `PXMP`/`PMP` (10), `EPXC`/`PXE` (4), `MECF`/`MCF` (3),
+  `MCFP`/`MCA` (2), `PXCE`/`PCE` (1) -- so a decoder may treat either as
+  recovering the other, but **must not** treat the list as closed: `PXMP`
+  alone was a third of that estate and appears in no panel-database
+  sample. [S]
 - **`<Services>` carries a repeated `<FLN LAN="n">TYPE</FLN>` element** that
   the template does not show. It declares the fieldbus type *per LAN number*
   and is the clearest statement of a panel's fieldbus layout the protocol
