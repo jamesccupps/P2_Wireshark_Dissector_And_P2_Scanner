@@ -5531,6 +5531,14 @@ def _cold_status_query_probe(host: str, scanner_name: str,
         sup_strings = _extract_tlv_strings(body_after)
         supervisor = next((s for s in sup_strings if s != "SYST"), us_resp)
 
+        # The response frame's own header-length field (PROTOCOL.md 6.2),
+        # read back off the wire. This name was a leftover from the removed
+        # 0x33/0x34 probe loop above and was bound nowhere, so every
+        # SUCCESSFUL probe raised NameError here. It looked like a working
+        # function because every failure path returns before reaching this
+        # point -- the bug was reachable only on the happy path.
+        msg_type = struct.unpack('>I', data[4:8])[0]
+
         return {
             'bln': bln_resp,
             'panel': panel_resp,
