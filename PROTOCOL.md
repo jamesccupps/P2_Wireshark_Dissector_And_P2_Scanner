@@ -10385,6 +10385,24 @@ every observed value was `NO` except **`FPWeb=YES` on nine panels** — an
 independent confirmation of the HTTP service in §4.1.1's port surface, stated
 by the panel about itself. [S]
 
+**`RENO` is Remote Notification**, and the vendor says so itself rather than
+leaving it to the initials. The help corpus is authored with conditional text
+for two product brandings, and one topic emits both spellings of the same
+string side by side — an APOGEE span reading `RENO` immediately followed by a
+TALON span reading `T-Mote Remote Notification`. The feature dispatches alarm
+and event information to contacts by voice and pager, and lets a contact phone
+in to check system status or stop a notification. Its editor is a separate
+application, `RENOEdit`. [D]
+
+That matters to a decoder for one reason. **`<RENO Enabled="..." />` on a panel
+is not a statement that the panel can place a call.** The telephony is Dialogic
+boards — at most two per machine — installed in a **workstation** designated as
+the Remote Notification server, not in any field panel, and notification is
+armed per *point* by assigning devices, groups and escalation lists. The panel
+flag therefore records participation in a service hosted elsewhere on the MLN,
+which is why it reads `NO` on panels at a site that runs the option. Reading it
+as a panel-local capability inverts its meaning. [D]
+
 This content comes from stored panel databases, not from a capture. The
 statement above that neither opcode appears in the corpus was re-verified
 across all 229 captures, including the panel-side captures: zero occurrences of
