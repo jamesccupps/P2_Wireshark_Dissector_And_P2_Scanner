@@ -6093,6 +6093,20 @@ it. The content is exactly what the name promises: the address of the contact
 that reports the point actually did what it was told, and how long to wait
 before deciding it did not.
 
+The vendor's operator help supplies the two things the type system cannot.
+The delay is **in seconds**, and the configurable range is **0 to 32,766**:
+the timer starts at the point's change-of-value, and when it expires the
+panel compares the proof point against the commanded value of its associated
+output point and puts the point into alarm if they disagree. [D] This is the
+mechanism behind the `proofing` operating state and the `proof_on` COV
+condition bit.
+
+That range is **narrower than the `u16` that carries it**. 32,766 is
+2^15 - 2, so slightly more than half the encodable range is unreachable
+through the supervisor's own configuration path. Whether a panel rejects a
+larger value presented on the wire, or whether `0x7FFF` and above are
+reserved as sentinels, is not established here. [D][OPEN]
+
 **All sixteen arms are now decodable**, six of them wire-observed here and ten
 resting on the type system alone. That is the state to hold in mind when reading
 §10.9: the arms stopped being the document's bottleneck. [S]
