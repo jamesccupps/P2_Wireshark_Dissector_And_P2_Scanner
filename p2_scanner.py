@@ -6824,10 +6824,14 @@ def polished_cold_discover(network: Optional[str] = None,
 # real DCC to retry to panels that get confused by duplicate ACKs — use only on
 # a dedicated IP or during a maintenance window for passive reconnaissance.
 
-def _parse_routing_header(payload: bytes) -> Optional[Tuple[bytes, List[str], bytes]]:
+def _parse_routing_header(payload: bytes) -> Optional[Tuple[int, List[str], bytes]]:
     """Split P2 routing header off the payload.
 
     Returns ``(direction_byte, [name1, name2, name3, name4], remaining_body)``
+    where direction_byte is an **int**. It was a one-byte slice until
+    2026-09-22, which silently disabled every `dir_byte == 0x00` test in
+    the push listener -- bytes never equal an int. analyze_pcap.py and the
+    pcap reader at _scan_for_routing_tables both use the int form.
     or None on parse failure. The four names are:
         [BLN, destination, BLN, source]  for DATA/HEARTBEAT messages
         [BLN, sender, BLN, recipient]    for CONNECT/ANNOUNCE (order reversed)
@@ -6835,7 +6839,7 @@ def _parse_routing_header(payload: bytes) -> Optional[Tuple[bytes, List[str], by
     """
     if not payload:
         return None
-    dir_byte = payload[0:1]
+    dir_byte = payload[0]
     names = []
     i = 1
     for _ in range(4):
@@ -7280,13 +7284,13 @@ def listen_for_push_notifications(port: int = 5033, duration: Optional[int] = No
                         # test beside it was a no-op at this site and would skip
                         # valid frames anywhere else, msg_type being a header
                         # length (PROTOCOL.md 6.2).
-                        if dir_byte == 0x00 and body:
+                        if dir_byte == 0x00:
                             # The 2-byte opcode is meaningful ONLY in dir==0x00 frames
                             # (requests / panel pushes). In a 0x01 success response the
                             # post-routing bytes are payload, and in a 0x05 error they are
                             # a 2-byte status code — reading an "opcode" off either would
                             # fabricate opcodes. (Verified against raw captures.)
-                            if dir_byte == 0x00:
+                            if body:
                                 op_bytes = body[:2]
                                 op = struct.unpack('>H', op_bytes)[0] if len(op_bytes) == 2 else None
                                 event['opcode'] = f'0x{op:04X}' if op is not None else '?'
@@ -7320,15 +7324,15 @@ def listen_for_push_notifications(port: int = 5033, duration: Optional[int] = No
                                         event.update(parsed)
                                 else:
                                     event['event'] = 'unknown_opcode'
-                            elif dir_byte == 0x05:
-                                # Panel error response — 2-byte status code, not an opcode.
-                                err = struct.unpack('>H', body[:2])[0] if len(body) >= 2 else None
-                                event['event'] = 'error_response'
-                                if err is not None:
-                                    event['error'] = _P2_STATUS_ERRORS.get(err, f'0x{err:04X}')
-                            else:
-                                # dir_byte == 0x01 — success response; payload, no opcode.
-                                event['event'] = 'response'
+                        elif dir_byte == 0x05:
+                            # Panel error response — 2-byte status code, not an opcode.
+                            err = struct.unpack('>H', body[:2])[0] if len(body) >= 2 else None
+                            event['event'] = 'error_response'
+                            if err is not None:
+                                event['error'] = _P2_STATUS_ERRORS.get(err, f'0x{err:04X}')
+                        else:
+                            # dir_byte == 0x01 — success response; payload, no opcode.
+                            event['event'] = 'response'
                     else:
                         # The routing header did not parse. Earlier releases
                         # guessed "2nd-channel identity" here from msg_type,
