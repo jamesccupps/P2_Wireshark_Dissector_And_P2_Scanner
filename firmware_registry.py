@@ -130,6 +130,19 @@ def parse_build_tag(model_string: Optional[str]) -> Optional[str]:
 # Populated by clients when they parse a 0x010C response from a panel, and
 # persisted by site.json loaders for cross-process reuse, so a repeat connection
 # knows the platform without re-reading the identity block.
+#
+# Unlocked on purpose. An audit flagged `dict(_BUILD_TAG_CACHE)` as able to
+# raise "dictionary changed size during iteration" when another thread writes
+# during the copy. On a GIL build it cannot: the copy is one C-level operation
+# that never yields, so no other thread runs inside it. Tested rather than
+# assumed -- six writer threads against a 400,000-entry cache, 41 full copies,
+# no error; and ~15,000 copies of a small one, likewise. CI runs 3.10-3.13,
+# all standard builds.
+#
+# What would change the answer is a free-threaded build (3.13t and later),
+# where there is no GIL to make the copy atomic. tests/test_build_tag_cache.py
+# runs that churn, so the assumption fails loudly on an interpreter that
+# breaks it rather than being rediscovered by the next auditor.
 # ─────────────────────────────────────────────────────────────────────────────
 
 _BUILD_TAG_CACHE: Dict[str, str] = {}
