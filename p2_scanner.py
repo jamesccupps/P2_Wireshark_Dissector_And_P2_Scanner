@@ -1108,11 +1108,24 @@ class P2Message:
 
     @classmethod
     def from_bytes(cls, data: bytes) -> Optional['P2Message']:
+        """One complete frame, or None if `data` does not hold one.
+
+        total_len used to be read and then used straight as a slice bound,
+        which truncates instead of raising: a frame claiming 500 bytes with
+        100 delivered produced an 88-byte payload and no sign anything was
+        missing. _recv_message never hands this a short buffer, so nothing
+        in-tree hit it -- but p2_scanner is imported as a library, and there
+        a short read became a quietly wrong message.
+
+        Trailing bytes past total_len are left alone; a caller holding two
+        frames in one buffer is a legitimate case.
+        """
         if len(data) < 12:
             return None
         total_len, msg_type, sequence = struct.unpack('>III', data[:12])
-        payload = data[12:total_len]
-        return cls(msg_type, sequence, payload)
+        if total_len < 12 or len(data) < total_len:
+            return None
+        return cls(msg_type, sequence, data[12:total_len])
 
 
 
