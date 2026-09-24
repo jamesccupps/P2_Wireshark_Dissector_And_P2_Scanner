@@ -3762,7 +3762,7 @@ def probe_p2_host(host: str) -> Optional[Dict[str, str]]:
                 b'\x00'                                # trailing null
             )
             payload = routing + identity
-            msg = struct.pack('>III', 12 + len(payload), 0x33, seq) + payload
+            msg = p2_frame(payload, seq)        # derived; the names vary per probe
             try:
                 s.sendall(msg)
             except (BrokenPipeError, ConnectionResetError, OSError):
@@ -5090,7 +5090,7 @@ def _cold_probe(host: str, bln: str, scanner: str, node: str,
         struct.pack('>I', int(time.time())) + b'\x00\x00\x00'
     )
     payload = routing + identity
-    frame = struct.pack('>III', 12 + len(payload), 0x33, secrets.randbits(24)) + payload
+    frame = p2_frame(payload, secrets.randbits(24))
 
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -5447,8 +5447,7 @@ def cold_discover_silent_sysinfo(host: str, discovery: Dict,
                bln_b + b'\x00' + sv_b + b'\x00')
     body = b'\x01\x0C'   # 0x010C SysInfoCompact request, empty body
     payload = routing + body
-    frame = struct.pack('>III', 12 + len(payload), 0x33,
-                        secrets.randbits(24)) + payload
+    frame = p2_frame(payload, secrets.randbits(24))
 
     sock = None
     try:
