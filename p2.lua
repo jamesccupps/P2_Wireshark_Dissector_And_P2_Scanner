@@ -1917,6 +1917,7 @@ end
 -- comment block at the top of this file. Keep it in step with that block: a
 -- capture saved by an unknown build is only identifiable if this is honest.
 local P2_DISSECTOR_VERSION = "2.10.0"
+local P2_MIN_FRAME_LEN = 17   -- PROTOCOL.md 6.1.1; matches p2_scanner.P2_MIN_FRAME_LEN
 
 local p2 = Proto("p2", "Siemens APOGEE P2 (Protocol II) v" .. P2_DISSECTOR_VERSION)
 
@@ -3740,7 +3741,11 @@ function p2.dissector(tvb, pinfo, tree)
       return
     end
     local total = tvb(offset,4):uint()
-    if total < 13 or total > 65536 then return end
+    -- PROTOCOL.md 6.1.1: 13 header bytes plus four NUL terminators is 17,
+    -- so nothing below that can describe a frame. This said 13 while
+    -- p2_scanner said 12, which meant a header-only frame was accepted by
+    -- one reader and refused by the other.
+    if total < P2_MIN_FRAME_LEN or total > 65536 then return end
     if offset + total > len then
       pinfo.desegment_offset = offset; pinfo.desegment_len = (offset+total)-len; return
     end

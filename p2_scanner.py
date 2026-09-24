@@ -910,6 +910,17 @@ QUICK_SCAN_POINTS = [
 # P2 PROTOCOL IMPLEMENTATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
+#: Smallest byte count that can describe a P2 frame, per PROTOCOL.md 6.1.1:
+#: a 13-byte header (the u32 triple plus the direction byte) and four NUL
+#: terminators for four empty routing slots. A request adds two opcode bytes
+#: for 19, but a framing layer has not read the direction byte yet, so 17 is
+#: the floor it can enforce. The smallest well-formed frame anywhere in the
+#: corpus is 41 bytes. This was written as 12 in six places here and as 13 in
+#: p2.lua, so a header-only frame was accepted by one reader and refused by
+#: the other.
+P2_MIN_FRAME_LEN = 17
+
+
 class P2Message:
     """Represents a single P2 protocol message."""
     # There are no "message types". The u32 at offset 4 is a HEADER LENGTH --
@@ -1123,7 +1134,7 @@ class P2Message:
         if len(data) < 12:
             return None
         total_len, msg_type, sequence = struct.unpack('>III', data[:12])
-        if total_len < 12 or len(data) < total_len:
+        if total_len < P2_MIN_FRAME_LEN or len(data) < total_len:
             return None
         return cls(msg_type, sequence, data[12:total_len])
 
@@ -1453,7 +1464,7 @@ class P2Connection:
             # value here means either framing desync or a hostile peer sending
             # a forged length field. Either way, refusing to read 4GB into
             # memory is the right move. Same threshold as the supervisor-port listener.
-            if total_len < 12 or total_len > 65536:
+            if total_len < P2_MIN_FRAME_LEN or total_len > 65536:
                 self._recv_buffer = b''
                 return None
 
@@ -3059,11 +3070,11 @@ def sniff_pcap(pcap_file: str, output_format: str = "table") -> List[Dict]:
             if remaining < 12:
                 break
             total_len = struct.unpack('>I', raw[pos:pos+4])[0]
-            # Malformed frame (length under 12 = invalid; over remaining =
-            # truncated/forged). Stop parsing this segment rather than
+            # Malformed frame (under P2_MIN_FRAME_LEN = invalid; over
+            # remaining = truncated/forged). Stop parsing this segment rather than
             # consuming whatever's left as one giant fake frame — that would
             # corrupt subsequent iteration state and could panic the parser.
-            if total_len < 12 or total_len > remaining:
+            if total_len < P2_MIN_FRAME_LEN or total_len > remaining:
                 break
             msg = raw[pos:pos+total_len]
             pos += total_len
@@ -3929,10 +3940,10 @@ def _recv_one_frame(sock: socket.socket, max_payload: int = 65536,
                 return None
             buf.extend(chunk)
         total_len = struct.unpack('>I', bytes(buf[:4]))[0]
-        # Sanity-check: PROTOCOL.md §6.1: minimum frame is 12 bytes (header only);
-        # maximum is bounded by max_payload + 12. A length outside this window
-        # is a framing failure — bail rather than try to recover.
-        if total_len < 12 or total_len > max_payload + 12:
+        # Sanity-check against PROTOCOL.md §6.1.1: below P2_MIN_FRAME_LEN the
+        # length cannot describe a frame; above max_payload + 12 it is a forged
+        # or desynced prefix. Either way bail rather than try to recover.
+        if total_len < P2_MIN_FRAME_LEN or total_len > max_payload + 12:
             return None
         # Step 2: top up to total_len.
         while len(buf) < total_len:
@@ -4525,7 +4536,7 @@ def discover_devices_on_node(host: str, node_name: str,
                 if len(all_data) - pos < 12:
                     break
                 msg_len = struct.unpack('>I', all_data[pos:pos+4])[0]
-                if msg_len < 12 or msg_len > len(all_data) - pos:
+                if msg_len < P2_MIN_FRAME_LEN or msg_len > len(all_data) - pos:
                     pos += 1
                     continue
                 msg_data = all_data[pos:pos+msg_len]
@@ -7323,7 +7334,7 @@ def listen_for_push_notifications(port: int = 5033, duration: Optional[int] = No
                 # Parse as many complete P2 messages as we have
                 while len(buf) >= 12:
                     total_len, msg_type, seq = struct.unpack('>III', buf[:12])
-                    if total_len < 12 or total_len > 65536:
+                    if total_len < P2_MIN_FRAME_LEN or total_len > 65536:
                         # Framing desync — discard and move on
                         buf = b''
                         break
