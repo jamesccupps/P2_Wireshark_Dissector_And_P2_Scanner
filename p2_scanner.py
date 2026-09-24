@@ -3871,37 +3871,62 @@ def _recv_one_frame(sock: socket.socket, max_payload: int = 65536,
     can buffer to the exact length and avoid both truncation (slow links)
     and over-reading (multiple frames piggybacked from the panel).
 
+    `overall_timeout` bounds the whole frame, not each recv. It used to be
+    the per-recv timeout, which meant a peer dribbling one byte just inside
+    the interval held the loop open for as long as it cared to -- the
+    parameter promised a bound it did not provide.
+
     Returns the complete frame bytes (header+payload) on success, or None
-    on EOF, timeout before the frame is complete, or a malformed length
-    prefix.
+    on EOF, deadline reached before the frame is complete, or a malformed
+    length prefix.
     """
-    sock.settimeout(overall_timeout)
+    deadline = time.monotonic() + overall_timeout
+
+    def recv(n: int) -> Optional[bytes]:
+        """One recv, bounded by what is left of the deadline.
+
+        None covers the three outcomes the caller treats alike: deadline
+        reached, socket error, and EOF.
+        """
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        try:
+            sock.settimeout(remaining)
+            chunk = sock.recv(n)
+        except (socket.timeout, OSError):
+            return None
+        return chunk or None
+
     buf = bytearray()
-    # Step 1: read the 4-byte length prefix.
-    while len(buf) < 4:
+    try:
+        # Step 1: read the 4-byte length prefix.
+        while len(buf) < 4:
+            chunk = recv(4096)
+            if chunk is None:
+                return None
+            buf.extend(chunk)
+        total_len = struct.unpack('>I', bytes(buf[:4]))[0]
+        # Sanity-check: PROTOCOL.md §6.1: minimum frame is 12 bytes (header only);
+        # maximum is bounded by max_payload + 12. A length outside this window
+        # is a framing failure — bail rather than try to recover.
+        if total_len < 12 or total_len > max_payload + 12:
+            return None
+        # Step 2: top up to total_len.
+        while len(buf) < total_len:
+            chunk = recv(min(4096, total_len - len(buf)))
+            if chunk is None:
+                return None
+            buf.extend(chunk)
+        return bytes(buf[:total_len])
+    finally:
+        # The old code left the socket on overall_timeout. enumerate_fln_devices
+        # reuses one socket across iterations, so leaving a near-zero deadline
+        # remainder behind would break the next sendall.
         try:
-            chunk = sock.recv(4096)
-        except (socket.timeout, OSError):
-            return None
-        if not chunk:
-            return None
-        buf.extend(chunk)
-    total_len = struct.unpack('>I', bytes(buf[:4]))[0]
-    # Sanity-check: PROTOCOL.md §6.1: minimum frame is 12 bytes (header only); maximum
-    # is bounded by max_payload + 12. A length outside this window is a
-    # framing failure — bail rather than try to recover.
-    if total_len < 12 or total_len > max_payload + 12:
-        return None
-    # Step 2: top up to total_len.
-    while len(buf) < total_len:
-        try:
-            chunk = sock.recv(min(4096, total_len - len(buf)))
-        except (socket.timeout, OSError):
-            return None
-        if not chunk:
-            return None
-        buf.extend(chunk)
-    return bytes(buf[:total_len])
+            sock.settimeout(overall_timeout)
+        except OSError:
+            pass
 
 
 def _send_handshake(sock: socket.socket, handshake: bytes,
