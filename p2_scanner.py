@@ -3900,9 +3900,13 @@ def _recv_one_frame(sock: socket.socket, max_payload: int = 65536,
 
     buf = bytearray()
     try:
-        # Step 1: read the 4-byte length prefix.
+        # Step 1: read the 4-byte length prefix, and not one byte more. This
+        # used to ask for 4096, which reads into whatever the panel piggybacked
+        # behind the frame -- and those bytes were then dropped by the
+        # buf[:total_len] slice at the end. enumerate_fln_devices calls this in
+        # a loop on one socket, so the next iteration started mid-frame.
         while len(buf) < 4:
-            chunk = recv(4096)
+            chunk = recv(4 - len(buf))
             if chunk is None:
                 return None
             buf.extend(chunk)
@@ -3918,7 +3922,7 @@ def _recv_one_frame(sock: socket.socket, max_payload: int = 65536,
             if chunk is None:
                 return None
             buf.extend(chunk)
-        return bytes(buf[:total_len])
+        return bytes(buf)          # exactly total_len; nothing was over-read
     finally:
         # The old code left the socket on overall_timeout. enumerate_fln_devices
         # reuses one socket across iterations, so leaving a near-zero deadline
