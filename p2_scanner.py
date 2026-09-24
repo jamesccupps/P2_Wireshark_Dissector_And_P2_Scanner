@@ -304,7 +304,7 @@ def _wire_name(value: Optional[str], field: str,
         raise ScannerInputError(
             f"{field} contains an embedded NUL byte at index "
             f"{value.index(chr(0))}; NUL is the routing-slot delimiter and "
-            f"cannot appear inside a name")
+            "cannot appear inside a name")
     try:
         encoded = value.encode('ascii')
     except UnicodeEncodeError as exc:
@@ -1260,20 +1260,20 @@ def check_emit_allowed(opcode: int) -> None:
     if opcode in EBLN_STALL_RISK:
         raise PermissionError(
             f"{op_label(opcode)} is a denial-of-service risk (observed ~18 s panel "
-            f"outage) and is never emitted by this tool.")
+            "outage) and is never emitted by this tool.")
     if opcode in EBLN_WRITES:
         raise PermissionError(
             f"{op_label(opcode)} is an EBLN write/configuration operation and is "
-            f"never emitted by this tool. Use the panel console if you intend "
-            f"to change configuration.")
+            "never emitted by this tool. Use the panel console if you intend "
+            "to change configuration.")
     if opcode in EBLN_DIAGNOSTIC_RANGE and opcode not in EBLN_READS:
         raise PermissionError(
             f"{op_label(opcode)} is in the EBLN replication diagnostic block and "
-            f"has not been identified. Two of the six reports this family "
-            f"produces are 'Add Data Store' and 'Delete Data Store', and the "
-            f"opcode-to-report mapping is unknown, so this tool will not send "
-            f"it. 0x464C is permitted because three independent sources agree "
-            f"it is the read-only NodeList report.")
+            "has not been identified. Two of the six reports this family "
+            "produces are 'Add Data Store' and 'Delete Data Store', and the "
+            "opcode-to-report mapping is unknown, so this tool will not send "
+            "it. 0x464C is permitted because three independent sources agree "
+            "it is the read-only NodeList report.")
 
 class P2Connection:
     """Manages a TCP connection to a PXC controller using the P2 protocol."""
@@ -1326,7 +1326,7 @@ class P2Connection:
         # P2 session handshake: send a keepalive/heartbeat to establish the session
         # The PXC won't respond to read requests until it sees this.
         if not self._handshake(node_name):
-            print(f"  [ERROR] P2 handshake failed — controller did not respond")
+            print("  [ERROR] P2 handshake failed — controller did not respond")
             self.close()
             return False
 
@@ -2837,7 +2837,7 @@ def scan_device(host: str, device: str, points: Optional[List[str]] = None,
                         raise ScannerInputError(
                             f"Can't resolve slot {slot} — failed to read "
                             f"APPLICATION from {device}. Try a named point first, "
-                            f"or pass force_slot=True to attempt the read anyway.")
+                            "or pass force_slot=True to attempt the read anyway.")
                     resolved = resolve_slot_to_name(scan_app_num, slot)
                     if resolved:
                         print(f"  Slot {slot} on app {scan_app_num} = {resolved!r}")
@@ -2854,20 +2854,20 @@ def scan_device(host: str, device: str, points: Optional[List[str]] = None,
                         conn.close()
                         raise ScannerInputError(
                             f"Slot {slot} is not defined in app {scan_app_num}. "
-                            f"Use --force-slot (CLI) or force_slot=True (library) "
-                            f"to try anyway.")
+                            "Use --force-slot (CLI) or force_slot=True (library) "
+                            "to try anyway.")
                 else:
                     scan_list.append(p_stripped)
     else:
         # First, read APPLICATION to get the right point table
-        print(f"  Reading APPLICATION number...")
+        print("  Reading APPLICATION number...")
         app_result = conn.read_point(device, "APPLICATION", node_name)
         app_num = None
         if app_result and app_result.get('value') is not None:
             app_num = int(app_result['value'])
             comm = app_result.get('comm_status', 'online')
             if comm == 'comm_fault':
-                print(f"  ⚠ Device has #COM — values will be stale cached data")
+                print("  ⚠ Device has #COM — values will be stale cached data")
             print(f"  Application: {app_num}")
         scan_app_num = app_num
 
@@ -2895,8 +2895,8 @@ def scan_device(host: str, device: str, points: Optional[List[str]] = None,
     if scan_app_num is not None and app_supports_p2(scan_app_num) is False:
         meta = get_app_meta(scan_app_num) or {}
         print(f"  ⚠ App {scan_app_num} ({meta.get('descr', 'unknown')}) is a "
-              f"BACnet/MSTP transport — P2 reads will likely fail. This device "
-              f"should be reached via BACnet/IP if the panel acts as a router.")
+              "BACnet/MSTP transport — P2 reads will likely fail. This device "
+              "should be reached via BACnet/IP if the panel acts as a router.")
 
     results = []
     total = len(scan_list)
@@ -3227,7 +3227,7 @@ def sniff_pcap(pcap_file: str, output_format: str = "table") -> List[Dict]:
         except AttributeError:
             top = sorted(cov_sources.items(), key=lambda kv: -kv[1])[:10]
         if top:
-            print(f"\n  ── COV / value pushes by source node ──")
+            print("\n  ── COV / value pushes by source node ──")
             for node, n in top:
                 print(f"  {node:<24} {n:>6} events")
 
@@ -3269,10 +3269,10 @@ def print_results_table(device: str, results: List[Dict]):
 
     if total_with_status > 0 and comm_fault_count == total_with_status:
         print(f"\n  ⚠ WARNING: Device {device} has #COM (communication fault)")
-        print(f"  Values shown are STALE cached data — device is offline!")
+        print("  Values shown are STALE cached data — device is offline!")
     elif comm_fault_count > total_with_status * 0.5:
         print(f"\n  ⚠ WARNING: {comm_fault_count}/{total_with_status} points show #COM")
-        print(f"  Device may be offline — some values could be stale")
+        print("  Device may be offline — some values could be stale")
     elif comm_fault_count > 0:
         print(f"\n  Note: {comm_fault_count} point(s) show #COM (unconnected inputs)")
 
@@ -3669,7 +3669,7 @@ def sniff_network_name(duration: int = 10, interface: str = None) -> Optional[st
                               timeout=duration + 10)
 
         if not os.path.exists(tmpfile) or os.path.getsize(tmpfile) < 100:
-            print(f"    No P2 traffic captured")
+            print("    No P2 traffic captured")
             return None
 
         # Parse the capture for network name
@@ -3713,13 +3713,13 @@ def sniff_network_name(duration: int = 10, interface: str = None) -> Optional[st
         return None
 
     except subprocess.TimeoutExpired:
-        print(f"    Capture timed out")
+        print("    Capture timed out")
         return None
     except FileNotFoundError:
-        print(f"    tshark not found or cannot execute")
+        print("    tshark not found or cannot execute")
         return None
     except PermissionError:
-        print(f"    Permission denied — try running as Administrator")
+        print("    Permission denied — try running as Administrator")
         return None
     finally:
         try:
@@ -4132,7 +4132,7 @@ def enumerate_fln_devices(host: str, node_name: str) -> List[Dict]:
         _hs_seq = secrets.randbits(24)
         if not _send_handshake(s, p2_frame(routing + identity, _hs_seq), host=host):
             s.close()
-            print(f"    [ERROR] Handshake failed")
+            print("    [ERROR] Handshake failed")
             return []
 
         cursor = "*"
@@ -4273,7 +4273,7 @@ def verify_devices(host: str, node_name: str, devices: List[Dict],
     conn = P2Connection(host, network=P2_NETWORK if P2_NETWORK else "P2NET",
                         scanner_name=SCANNER_NAME)
     if not conn.connect(node_name.lower()):
-        print(f"    [ERROR] Could not connect for verification")
+        print("    [ERROR] Could not connect for verification")
         return devices
 
     total = len(devices)
@@ -4434,11 +4434,11 @@ def discover_devices_on_node(host: str, node_name: str,
     """
     # Try FLN enumerate first (fast, complete, no brute force)
     if use_enumerate and device_list is None:
-        print(f"    Trying FLN enumerate...")
+        print("    Trying FLN enumerate...")
         devs = enumerate_fln_devices(host, node_name)
         if devs:
             return devs
-        print(f"    Enumerate returned no devices, falling back to brute force...")
+        print("    Enumerate returned no devices, falling back to brute force...")
 
     candidates = device_list or DISCOVERY_DEVICE_PATTERNS
     found = []
@@ -4476,7 +4476,7 @@ def discover_devices_on_node(host: str, node_name: str,
         _hs_seq = secrets.randbits(24)  # random 24-bit seq, as a real supervisor uses
         if not _send_handshake(s, p2_frame(hb_payload, _hs_seq), host=host):
             s.close()
-            print(f"    [ERROR] Handshake failed")
+            print("    [ERROR] Handshake failed")
             return []
 
         total = len(candidates)
@@ -4643,7 +4643,7 @@ def discover_network(ip_ranges: str = "192.0.2", scan_ports: bool = True,
        OR read specific points across all devices (read_points=["ROOM TEMP"])
     """
     print(f"\n{'═' * 70}")
-    print(f"  P2 NETWORK DISCOVERY")
+    print("  P2 NETWORK DISCOVERY")
     print(f"{'═' * 70}")
 
     # Step 1: Find P2 hosts
@@ -4662,22 +4662,22 @@ def discover_network(ip_ranges: str = "192.0.2", scan_ports: bool = True,
 
     # Auto-learn the P2 network name if not already known
     if not P2_NETWORK:
-        print(f"\n  Auto-learning P2 network name...")
+        print("\n  Auto-learning P2 network name...")
         learned = learn_network_name(hosts)
         if learned:
             print(f"  Learned network: {learned}")
         else:
-            print(f"\n  ⚠ Could not auto-learn the P2 network name.")
-            print(f"    PXC controllers require the correct network name to respond.")
-            print(f"    Use --network <NAME> to specify it.")
-            print(f"    Find it in your BAS front-end (often listed under Field Networks).")
-            print(f"    Common formats: SITEBLN, SITEEBLN, SITE_BLN")
+            print("\n  ⚠ Could not auto-learn the P2 network name.")
+            print("    PXC controllers require the correct network name to respond.")
+            print("    Use --network <NAME> to specify it.")
+            print("    Find it in your BAS front-end (often listed under Field Networks).")
+            print("    Common formats: SITEBLN, SITEEBLN, SITE_BLN")
             print(f"\n    Example: p2_scanner.py --discover --range {ip_ranges} --network MYBLN")
             return
 
     # Step 2: Identify each node
     print(f"\n  [2/3] Identifying {len(hosts)} P2 nodes...")
-    print(f"        (trying common node names — this may take a moment)")
+    print("        (trying common node names — this may take a moment)")
     node_map = {}  # ip -> node_name
     for ip in hosts:
         # Check known_nodes first (from config file)
@@ -4745,7 +4745,7 @@ def discover_network(ip_ranges: str = "192.0.2", scan_ports: bool = True,
                 verify_devices(ip, name, devs, show_filter=verify)
 
             if scan_panel:
-                print(f"    Scanning panel-level points...")
+                print("    Scanning panel-level points...")
                 panel_pts = discover_panel_points(ip, name)
                 all_devices[name]['panel_points'] = panel_pts
                 if panel_pts:
@@ -4759,7 +4759,7 @@ def discover_network(ip_ranges: str = "192.0.2", scan_ports: bool = True,
     # Step 4: Optionally read all points on discovered devices
     if read_all and all_devices:
         print(f"\n{'═' * 70}")
-        print(f"  READING ALL POINTS ON DISCOVERED DEVICES")
+        print("  READING ALL POINTS ON DISCOVERED DEVICES")
         print(f"{'═' * 70}")
 
         for name in sorted(all_devices.keys()):
@@ -4848,10 +4848,10 @@ def discover_network(ip_ranges: str = "192.0.2", scan_ports: bool = True,
 
     # Summary
     print(f"\n{'═' * 70}")
-    print(f"  DISCOVERY RESULTS")
+    print("  DISCOVERY RESULTS")
     print(f"{'═' * 70}")
 
-    print(f"\n  P2 NODES:")
+    print("\n  P2 NODES:")
     for name in sorted(all_devices.keys()):
         info = all_devices[name]
         devs = info.get('devices', [])
@@ -5004,7 +5004,7 @@ def _cold_passive_bacnet(duration: int = 30, interface: str = '0.0.0.0',
             for s in _cold_extract_strings(data, min_len=4):
                 d['strings'].add(s)
     except KeyboardInterrupt:
-        print(f"  Interrupted.")
+        print("  Interrupted.")
     finally:
         sock.close()
     print(f"  Captured from {len(discoveries)} unique BACnet source(s)")
@@ -5356,7 +5356,7 @@ def cold_discover_v0_14(host: str,
                         print(f"      -> real site code        = {parsed.get('site')!r}")
                         print(f"      -> claimed supervisor    = "
                               f"{parsed.get('claimed_supervisor_echo')!r}  "
-                              f"(this is the placeholder echoed back, NOT real)")
+                              "(this is the placeholder echoed back, NOT real)")
                     break
             elif v == 'port_closed':
                 if verbose:
@@ -5375,7 +5375,7 @@ def cold_discover_v0_14(host: str,
 
     # Stage 2 — 0x0050 StatusQuery for real supervisor canonical name
     if verbose:
-        print(f"  cold_discover_v0_14 Stage 2: 0x0050 StatusQuery for supervisor name")
+        print("  cold_discover_v0_14 Stage 2: 0x0050 StatusQuery for supervisor name")
 
     sq = _cold_status_query_probe(
         host,
@@ -5410,17 +5410,17 @@ def cold_discover_v0_14(host: str,
             discovery['supervisor_name_with_port'] = sup_bare
 
         if verbose:
-            print(f"    HIT 0x0050 StatusQuery")
+            print("    HIT 0x0050 StatusQuery")
             print(f"      -> real supervisor name (bare)         = {sup_bare!r}")
             print(f"      -> canonical form (with default |5033) = "
                   f"{discovery['supervisor_name_with_port']!r}")
-            print(f"         (use this form in slot 4 of follow-up probes for")
-            print(f"          silent parallel-session accept)")
+            print("         (use this form in slot 4 of follow-up probes for")
+            print("          silent parallel-session accept)")
     else:
         if verbose:
-            print(f"    0x0050 StatusQuery did not return supervisor name")
-            print(f"    (panel may be on strict-peer-list firmware; falling back to "
-                  f"passive supervisor-port sniff or manual lookup)")
+            print("    0x0050 StatusQuery did not return supervisor name")
+            print("    (panel may be on strict-peer-list firmware; falling back to "
+                  "passive supervisor-port sniff or manual lookup)")
 
     return discovery
 
@@ -5649,11 +5649,11 @@ def _cold_cartesian_attack(host: str, bln_list: List[str],
                 print(f"ACCEPTED ({len(result['data'])} bytes)")
                 return (sc, bl, nd, result['data'])
             elif v == 'rejected_rst':
-                print(f"RST (wrong BLN)")
+                print("RST (wrong BLN)")
             elif v == 'rejected_silent':
-                print(f"silent (wrong scanner/node)")
+                print("silent (wrong scanner/node)")
             elif v == 'port_closed':
-                print(f"port closed — aborting")
+                print("port closed — aborting")
                 return None
             else:
                 print(f"{v}")
@@ -5702,7 +5702,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
     where nothing is preconfigured. Returns a dict suitable for site.json,
     or None on failure."""
     print(f"\n{'═' * 70}")
-    print(f"  COLD-SITE DISCOVERY")
+    print("  COLD-SITE DISCOVERY")
     print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'═' * 70}")
 
@@ -5716,7 +5716,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
             duration=bacnet_duration, interface=bacnet_interface,
             verbose=verbose)
         if discoveries:
-            print(f"\n  BACnet devices:")
+            print("\n  BACnet devices:")
             for ip in sorted(discoveries, key=lambda s: tuple(int(o) for o in s.split('.'))):
                 mac = _cold_get_arp_mac(ip)
                 vendor = _cold_classify_vendor(mac)
@@ -5737,7 +5737,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
         prefixes = inferred_prefixes
     else:
         prefixes = []
-        print(f"\n  No site prefix — falling back to universal candidates")
+        print("\n  No site prefix — falling back to universal candidates")
 
     # Phase 2: PXC discovery and fingerprint
     if pxc_ips:
@@ -5755,7 +5755,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
                 scan_ips.add(r)
         scan_ips.update(siemens_ips_from_bacnet)
         if not scan_ips:
-            print(f"\n  No scan targets. Provide --range or --pxc.")
+            print("\n  No scan targets. Provide --range or --pxc.")
             return None
         print(f"\n  PHASE 2: Port scan {len(scan_ips)} IPs for TCP/{P2_PORT}")
         candidate_ips = port_scan_p2(sorted(scan_ips,
@@ -5781,7 +5781,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
             print(f"    {host:<16} {r['verdict']}")
 
     if not siemens_pxcs:
-        print(f"\n  No Siemens PXCs identified.")
+        print("\n  No Siemens PXCs identified.")
         return None
 
     # Phase 2c: 0x0050 StatusQuery bootstrap (PROTOCOL.md §17.2).
@@ -5789,7 +5789,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
     # — far cheaper than the Cartesian attack in Phase 3. Strict-peer-list
     # panels reject this the same way they reject IdentifyBlock; we fall
     # through to Phase 3 if every host silent-drops.
-    print(f"\n  PHASE 2c: 0x0050 status-query bootstrap (§22.6)")
+    print("\n  PHASE 2c: 0x0050 status-query bootstrap (§22.6)")
     bootstrap_scanner = (f"{prefixes[0].upper()}DCC-SVR|5033" if prefixes
                          else "P2SCAN-LAP|5033")
     bootstrap_hits: Dict[str, Dict[str, Any]] = {}
@@ -5810,7 +5810,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
         bln = first['bln']
         scanner = first['supervisor']
         print(f"\n{'═' * 70}")
-        print(f"  COLD DISCOVERY COMPLETE (via 0x0050 bootstrap)")
+        print("  COLD DISCOVERY COMPLETE (via 0x0050 bootstrap)")
         print(f"{'═' * 70}")
         print(f"  BLN name:     {bln}")
         print(f"  Scanner name: {scanner}")
@@ -5829,7 +5829,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
             else:
                 site_config["known_nodes"][f"UNKNOWN_{ip.split('.')[-1]}"] = ip
 
-        print(f"\n  site.json content:")
+        print("\n  site.json content:")
         for line in json.dumps(site_config, indent=2).splitlines():
             print(f"  {line}")
         return site_config
@@ -5846,11 +5846,11 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
 
     if not hit:
         print(f"\n{'═' * 70}")
-        print(f"  INCOMPLETE — no working combo found")
+        print("  INCOMPLETE — no working combo found")
         print(f"{'═' * 70}")
         print(f"  Siemens PXCs: {', '.join(siemens_pxcs)}")
         if not force_full:
-            print(f"  Retry with --force-full for exhaustive sweep.")
+            print("  Retry with --force-full for exhaustive sweep.")
         return None
 
     scanner, bln, node_guess, data = hit
@@ -5858,7 +5858,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
     node = extracted or node_guess
 
     print(f"\n{'═' * 70}")
-    print(f"  COLD DISCOVERY COMPLETE")
+    print("  COLD DISCOVERY COMPLETE")
     print(f"{'═' * 70}")
     print(f"  BLN name:     {bln}")
     print(f"  Scanner name: {scanner}")
@@ -5876,7 +5876,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
         label = node if ip == target else f"UNKNOWN_{ip.split('.')[-1]}"
         site_config["known_nodes"][label] = ip
 
-    print(f"\n  site.json content:")
+    print("\n  site.json content:")
     for line in json.dumps(site_config, indent=2).splitlines():
         print(f"  {line}")
     return site_config
@@ -6169,7 +6169,7 @@ def passive_sniff_bln(duration: int = 10,
                 break
     if not tshark:
         if verbose:
-            print(f"  tshark not found — cannot passive-sniff BLN.")
+            print("  tshark not found — cannot passive-sniff BLN.")
         return None
 
     if verbose:
@@ -6190,7 +6190,7 @@ def passive_sniff_bln(duration: int = 10,
                            timeout=duration + 10)
         except subprocess.TimeoutExpired:
             if verbose:
-                print(f"  Sniff timed out.")
+                print("  Sniff timed out.")
             return None
         except (FileNotFoundError, PermissionError) as e:
             if verbose:
@@ -6200,8 +6200,8 @@ def passive_sniff_bln(duration: int = 10,
         if not os.path.exists(tmpfile) or os.path.getsize(tmpfile) < 100:
             if verbose:
                 print(f"  No TCP/5033 traffic captured in {duration} s "
-                      f"window (supervisor may be quiet, or interface may "
-                      f"not see BAS traffic).")
+                      "window (supervisor may be quiet, or interface may "
+                      "not see BAS traffic).")
             return None
 
         # Parse the pcapng — find the first valid P2 frame and extract
@@ -6217,8 +6217,8 @@ def passive_sniff_bln(duration: int = 10,
                 print(f"  BLN learned from wire: {bln!r}")
             return bln
         if verbose:
-            print(f"  TCP/5033 traffic captured but no parseable P2 frame "
-                  f"found.")
+            print("  TCP/5033 traffic captured but no parseable P2 frame "
+                  "found.")
         return None
     finally:
         try:
@@ -6319,7 +6319,7 @@ def _discover_bln_via_probe(host: str,
     for bln in bln_candidates:
         if stop_event is not None and stop_event.is_set():
             if verbose:
-                print(f"      Cancelled during BLN discovery.")
+                print("      Cancelled during BLN discovery.")
             return None
         if verbose:
             print(f"      BLN guess: {bln!r:<14}", end=" ", flush=True)
@@ -6332,7 +6332,7 @@ def _discover_bln_via_probe(host: str,
             return bln
         if v == 'port_closed':
             if verbose:
-                print(f"port closed (cannot continue against this host)")
+                print("port closed (cannot continue against this host)")
             return None
         if verbose:
             print(f"miss ({v})")
@@ -6412,8 +6412,8 @@ def auto_detect_site_prefixes(duration: int = 15,
             print(f"  Inferred site prefix(es): {prefixes}")
         else:
             print(f"  Captured {len(discoveries)} BACnet device(s) but "
-                  f"could not infer a dominant site prefix from device "
-                  f"names.")
+                  "could not infer a dominant site prefix from device "
+                  "names.")
     return prefixes
 
 
@@ -6474,7 +6474,7 @@ def cold_discover_minimal(network: str,
 
     if verbose:
         print(f"\n{'═' * 70}")
-        print(f"  COLD-DISCOVER (MINIMAL) — 2-packet primitive")
+        print("  COLD-DISCOVER (MINIMAL) — 2-packet primitive")
         print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"  network={network}  bln={bln!r}")
         print(f"  scanner identity (slot 4) = {WILDCARD_15CHAR_PLACEHOLDER!r}")
@@ -6516,7 +6516,7 @@ def cold_discover_minimal(network: str,
 
     if _cancelled():
         if verbose:
-            print(f"  Cancelled after port scan.")
+            print("  Cancelled after port scan.")
         return None
 
     # Phase A.5 — BLN auto-discovery (only when caller didn't supply one).
@@ -6542,9 +6542,9 @@ def cold_discover_minimal(network: str,
         inferred_prefixes: List[str] = []
         if not site_hint:
             if verbose:
-                print(f"\n  Phase A.4: passive BACnet recon (15 s) — no "
-                      f"site hint provided, listening for supervisor "
-                      f"device-name broadcasts to infer prefix")
+                print("\n  Phase A.4: passive BACnet recon (15 s) — no "
+                      "site hint provided, listening for supervisor "
+                      "device-name broadcasts to infer prefix")
             inferred_prefixes = auto_detect_site_prefixes(
                 duration=15, verbose=verbose)
             if inferred_prefixes:
@@ -6558,7 +6558,7 @@ def cold_discover_minimal(network: str,
 
         if _cancelled():
             if verbose:
-                print(f"  Cancelled after BACnet recon.")
+                print("  Cancelled after BACnet recon.")
             return None
 
         # Step 2: build candidate list (uses site_hint if we have one,
@@ -6586,19 +6586,19 @@ def cold_discover_minimal(network: str,
         )
         if not bln:
             if verbose:
-                print(f"\n  No BLN candidate accepted. Options:")
-                print(f"    1. Provide bln='<YOUR-BLN>' explicitly")
-                print(f"    2. Provide site_hint='<PREFIX>' (e.g. 'ACME' → "
-                      f"tries ACMEEBLN, ACMEBLN, ACME_BLN, etc.)")
-                print(f"    3. Look up BLN in Desigo CC > System Browser >")
-                print(f"       Field Networks")
+                print("\n  No BLN candidate accepted. Options:")
+                print("    1. Provide bln='<YOUR-BLN>' explicitly")
+                print("    2. Provide site_hint='<PREFIX>' (e.g. 'ACME' → "
+                      "tries ACMEEBLN, ACMEBLN, ACME_BLN, etc.)")
+                print("    3. Look up BLN in Desigo CC > System Browser >")
+                print("       Field Networks")
             return None
         if verbose:
             print(f"\n  BLN auto-discovered: {bln!r}")
 
     if _cancelled():
         if verbose:
-            print(f"  Cancelled after BLN discovery.")
+            print("  Cancelled after BLN discovery.")
         return None
 
     # Phase B — Per-PXC 2-packet primitive (Identify handshake + 0x0050
@@ -6607,8 +6607,8 @@ def cold_discover_minimal(network: str,
     # we can honour cancel between candidates (otherwise a per-host
     # call could run the full 20-candidate list before returning).
     if verbose:
-        print(f"\n  Phase B: Identify handshake + 0x0050 chain per PXC "
-              f"(2-packet primitive — single placeholder, idempotent writes)")
+        print("\n  Phase B: Identify handshake + 0x0050 chain per PXC "
+              "(2-packet primitive — single placeholder, idempotent writes)")
 
     discoveries: Dict[str, Dict[str, Any]] = {}
     supervisor_name: Optional[str] = None
@@ -6652,7 +6652,7 @@ def cold_discover_minimal(network: str,
         if verbose:
             print(f"\n  No panels responded to the Identify handshake. "
                   f"Verify the BLN name ({bln!r}) is correct — wrong BLN "
-                  f"causes every panel to TCP-RST without responding.")
+                  "causes every panel to TCP-RST without responding.")
         return None
 
     # Phase C — Synthesize site_config from per-panel discoveries.
@@ -6680,7 +6680,7 @@ def cold_discover_minimal(network: str,
 
     if verbose:
         print(f"\n{'═' * 70}")
-        print(f"  COLD-DISCOVER COMPLETE")
+        print("  COLD-DISCOVER COMPLETE")
         print(f"{'═' * 70}")
         print(f"  BLN:              {canonical_bln}")
         print(f"  Site (guessed):   {canonical_site}")
@@ -6688,12 +6688,12 @@ def cold_discover_minimal(network: str,
         print(f"  Panels resolved:  {len(site_config['known_nodes'])}/"
               f"{len(pxcs)}")
         print()
-        print(f"  Cleanup (one entry to remove BLN-wide):")
-        print(f"    telnet into any panel, then:")
+        print("  Cleanup (one entry to remove BLN-wide):")
+        print("    telnet into any panel, then:")
         print(f"      Fieldpanels dElete {WILDCARD_15CHAR_PLACEHOLDER}")
         print(f"      nodeNametable Remove {WILDCARD_15CHAR_PLACEHOLDER}")
-        print(f"    (Fieldpanels dElete FIRST, then nodeNametable Remove —")
-        print(f"     reverse order strands the field-panel entry)")
+        print("    (Fieldpanels dElete FIRST, then nodeNametable Remove —")
+        print("     reverse order strands the field-panel entry)")
     return site_config
 
 
@@ -6867,7 +6867,7 @@ def polished_cold_discover(network: Optional[str] = None,
                 print(f"\n  Saved site config to {save_to}")
             else:
                 print(f"\n  WARNING: could not write {save_to} "
-                      f"(returning discovery anyway)")
+                      "(returning discovery anyway)")
 
     return site_config
 
@@ -7738,11 +7738,11 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
         network = args.range[0] if args.range else None
         bln_for_discover = args.network or P2_NETWORK
         if not bln_for_discover or bln_for_discover == 'MYBLN':
-            print(f"\n  ERROR: --auto-discover requires the BLN name.")
-            print(f"  Pass --network <YOUR-BLN> (or have it set in your "
-                  f"loaded site.json's p2_network key).")
-            print(f"  Look it up in Desigo CC > System Browser > Field "
-                  f"Networks, or sniff a supervisor-port frame.")
+            print("\n  ERROR: --auto-discover requires the BLN name.")
+            print("  Pass --network <YOUR-BLN> (or have it set in your "
+                  "loaded site.json's p2_network key).")
+            print("  Look it up in Desigo CC > System Browser > Field "
+                  "Networks, or sniff a supervisor-port frame.")
             sys.exit(1)
         result = polished_cold_discover(
             network=network,
@@ -7785,7 +7785,7 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
             save_config(args.save)
             print(f"\n  Saved to {args.save}")
         elif result:
-            print(f"\n  To save: rerun with --save site.json")
+            print("\n  To save: rerun with --save site.json")
         return
 
     # ─── Passive supervisor-port listener — doesn't need the network name; extracts identity
@@ -7806,7 +7806,7 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
     if not P2_NETWORK and not args.pcap and not args.show_app and not args.list_nodes:
         # Try sniffing if requested or if we need the network name
         if hasattr(args, 'sniff') and args.sniff:
-            print(f"\n  Sniffing for P2 traffic...")
+            print("\n  Sniffing for P2 traffic...")
             name = sniff_network_name(duration=args.sniff)
             if name:
                 print(f"  Learned network: {P2_NETWORK}  |  Site: {P2_SITE}")
@@ -7815,8 +7815,8 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
                 elif args.config:
                     save_config(args.config)
             else:
-                print(f"  Could not learn network name from live traffic.")
-                print(f"  Make sure this machine can see P2 traffic (same VLAN as BAS).")
+                print("  Could not learn network name from live traffic.")
+                print("  Make sure this machine can see P2 traffic (same VLAN as BAS).")
                 if not (args.range or args.node):
                     return
 
@@ -7824,26 +7824,26 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
         if not P2_NETWORK and (args.range or args.node):
             # Try auto-sniff before giving up
             if not (hasattr(args, 'sniff') and args.sniff):
-                print(f"\n  Attempting to sniff P2 traffic for network name...")
+                print("\n  Attempting to sniff P2 traffic for network name...")
                 name = sniff_network_name(duration=5)
                 if name:
                     print(f"  Learned network: {P2_NETWORK}")
                     
             if not P2_NETWORK:
-                print(f"\n  ⚠ P2 network name required.")
-                print(f"    PXC controllers won't respond without the correct network name.")
-                print(f"")
-                print(f"    Options:")
-                print(f"      --network NAME         Specify it directly (e.g. --network MYBLN)")
-                print(f"      --pcap FILE            Learn it from a Wireshark capture")
-                print(f"      --sniff [SECONDS]      Live capture to auto-learn (needs tshark)")
-                print(f"      --config FILE          Load from a saved config")
-                print(f"")
-                print(f"    To get the network name:")
-                print(f"      1. Check Desigo CC → Field Networks → BLN name")
-                print(f"      2. Or: grab a 5-second Wireshark capture on the BAS server,")
-                print(f"         then: p2_scanner.py --pcap capture.pcapng")
-                print(f"      3. Or: run on the BAS server: p2_scanner.py --sniff 10")
+                print("\n  ⚠ P2 network name required.")
+                print("    PXC controllers won't respond without the correct network name.")
+                print("")
+                print("    Options:")
+                print("      --network NAME         Specify it directly (e.g. --network MYBLN)")
+                print("      --pcap FILE            Learn it from a Wireshark capture")
+                print("      --sniff [SECONDS]      Live capture to auto-learn (needs tshark)")
+                print("      --config FILE          Load from a saved config")
+                print("")
+                print("    To get the network name:")
+                print("      1. Check Desigo CC → Field Networks → BLN name")
+                print("      2. Or: grab a 5-second Wireshark capture on the BAS server,")
+                print("         then: p2_scanner.py --pcap capture.pcapng")
+                print("      3. Or: run on the BAS server: p2_scanner.py --sniff 10")
                 return
 
     # List nodes
@@ -7871,7 +7871,7 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
             save_config(args.save)
         elif P2_NETWORK and not args.save:
             print(f"\n  Learned network: {P2_NETWORK}  |  Site: {P2_SITE}")
-            print(f"  Tip: use --save site.json to save this for future scans")
+            print("  Tip: use --save site.json to save this for future scans")
         return
 
     # Standalone sniff mode
@@ -7883,10 +7883,10 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
             if args.save:
                 save_config(args.save)
             else:
-                print(f"  Use --save site.json to save for future scans")
+                print("  Use --save site.json to save for future scans")
         else:
-            print(f"\n  No P2 traffic detected.")
-            print(f"  Make sure this machine is on the BAS VLAN and tshark is installed.")
+            print("\n  No P2 traffic detected.")
+            print("  Make sure this machine is on the BAS VLAN and tshark is installed.")
         return
 
     # Discovery mode
@@ -7913,7 +7913,7 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
             print(f"{'═' * 70}")
             devs = discover_devices_on_node(host, node_name)
             if args.with_panel:
-                print(f"\n  Scanning panel-level points...")
+                print("\n  Scanning panel-level points...")
                 panel_pts = discover_panel_points(host, node_name)
                 for pt in panel_pts:
                     print(f"    {pt['point']:<35s} = {pt['value']:>10.2f} {pt.get('units', '')}")
@@ -7934,7 +7934,7 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
             # If --read-all, scan every discovered device
             if args.read_all and devs:
                 print(f"\n{'═' * 70}")
-                print(f"  READING ALL POINTS")
+                print("  READING ALL POINTS")
                 print(f"{'═' * 70}")
                 # If verified, only read online devices
                 for d in devs:
@@ -8003,7 +8003,7 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
                 if args.format == 'json':
                     print(json.dumps(info, indent=2))
             else:
-                print(f"  No response (panel may not support 0x010C — try --info for legacy 0x0100)")
+                print("  No response (panel may not support 0x010C — try --info for legacy 0x0100)")
         else:
             print(f"  Could not connect to {host}")
         return
@@ -8092,7 +8092,7 @@ Known nodes: """ + ', '.join(f"{n}={ip}" for n, ip in sorted(KNOWN_NODES.items()
             if info.get('raw_strings'):
                 print(f"  Raw:      {info['raw_strings']}")
         else:
-            print(f"  Could not get info (node may not support opcode 0x0100)")
+            print("  Could not get info (node may not support opcode 0x0100)")
     elif args.browse:
         print(f"  Use --discover instead: p2_scanner.py --node {args.node} --discover")
     else:
