@@ -343,7 +343,7 @@ def load_config(filepath: str) -> bool:
     when present; this enables the §30.4 fast-path on first contact.
     Unknown fields are tolerated (forward compat).
     """
-    global P2_NETWORK, P2_SITE, SCANNER_NAME, KNOWN_NODES
+    global P2_NETWORK, P2_SITE, SCANNER_NAME
     try:
         with open(filepath, 'r') as f:
             config = json.load(f)
@@ -3289,7 +3289,6 @@ def print_results_table(device: str, results: List[Dict]):
         name = r.get('point_name', '?')
         slot = r.get('point_slot')
         comm = r.get('comm_status', '')
-        info = r.get('point_info')
 
         # Desigo-style '(29) DAY.NGT' prefix when slot is known
         if slot is not None:
@@ -3626,7 +3625,7 @@ def sniff_network_name(duration: int = 10, interface: str = None) -> Optional[st
     Returns:
         P2 network name string, or None if not found
     """
-    global P2_NETWORK, P2_SITE
+    global P2_NETWORK
     import subprocess
     import shutil
     import tempfile
@@ -3665,8 +3664,8 @@ def sniff_network_name(duration: int = 10, interface: str = None) -> Optional[st
         if interface:
             cmd.extend(['-i', interface])
 
-        result = subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=duration + 10)
+        subprocess.run(cmd, capture_output=True, text=True,
+                       timeout=duration + 10)
 
         if not os.path.exists(tmpfile) or os.path.getsize(tmpfile) < 100:
             print("    No P2 traffic captured")
@@ -5449,14 +5448,12 @@ def cold_discover_silent_sysinfo(host: str, discovery: Dict,
     # Prefer port-suffixed form (active-session-bound); fall back to bare
     supervisor_name = (discovery.get('supervisor_name_with_port')
                        or discovery.get('supervisor_name'))
-    site = discovery.get('site') or 'DIAGSITE'
 
     if not all([bln, panel_name, supervisor_name]):
         return None
 
     bln_b = bln.encode('ascii')
     sv_b = supervisor_name.encode('ascii')
-    site_b = site.encode('ascii')
     node_b = panel_name.lower().encode('ascii')
 
     routing = (b'\x00' + bln_b + b'\x00' + node_b + b'\x00' +
