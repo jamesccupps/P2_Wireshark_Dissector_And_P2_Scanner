@@ -1916,7 +1916,7 @@ end
 -- versions independently (p2_scanner.__version__). History is in the Changelog
 -- comment block at the top of this file. Keep it in step with that block: a
 -- capture saved by an unknown build is only identifiable if this is honest.
-local P2_DISSECTOR_VERSION = "2.9"
+local P2_DISSECTOR_VERSION = "2.10.0"
 
 local p2 = Proto("p2", "Siemens APOGEE P2 (Protocol II) v" .. P2_DISSECTOR_VERSION)
 
