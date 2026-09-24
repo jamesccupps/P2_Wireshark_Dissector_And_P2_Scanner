@@ -10,23 +10,25 @@ This file is the merge of the former p2_gui.py + p2_gui_widgets.py + p2_gui_work
 
 from __future__ import annotations
 
+# Three modules' import blocks, concatenated by the merge above and never
+# reconciled: `typing` was imported three times, `tkinter.ttk` twice, and
+# contextlib's redirect_stdout / redirect_stderr not at all usefully -- the
+# QueueWriter docstring below explains why this file cannot use them.
 import argparse
 import csv as _csv
+import datetime
 import json
 import os
 import queue
 import sys
-import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog, ttk
-from typing import Any, Dict, List, Optional, Tuple
 import threading
 import time
 import traceback
-from contextlib import contextmanager, redirect_stdout, redirect_stderr
-from typing import Any, Callable, Hashable, Tuple
-import datetime
-from tkinter import ttk
-from typing import Callable, Dict, Iterable, List, Optional, Tuple
+import tkinter as tk
+from contextlib import contextmanager
+from tkinter import filedialog, messagebox, simpledialog, ttk
+from typing import (Any, Callable, Dict, Hashable, Iterable, List, Optional,
+                    Tuple)
 
 # p2_scanner is located at runtime, not import time. The GUI zip and the
 # scanner zip usually get extracted to different folders; we'd rather hunt
@@ -3962,9 +3964,9 @@ class MainWindow:
 
         # Step 1: ask for subnet to scan
         subnet_prompt = (
-            f"Cold-discover via the validated 2-packet primitive.\n"
+            "Cold-discover via the validated 2-packet primitive.\n"
             f"Auto-detected subnet: {default_range or '(none)'}\n\n"
-            f"Subnet (CIDR, e.g. 192.0.2.0/24):"
+            "Subnet (CIDR, e.g. 192.0.2.0/24):"
         )
         network = simpledialog.askstring(
             "Cold Discover — step 1/3: subnet",
@@ -4101,11 +4103,11 @@ class MainWindow:
             steps.append("15 s passive BACnet/IP recon (UDP/47808) "
                          "to infer site prefix")
         if not bln:
-            steps.append(f"Active BLN auto-discover against first PXC\n"
-                         f"     (wrong-BLN guesses TCP-RST — NO writes)")
+            steps.append("Active BLN auto-discover against first PXC\n"
+                         "     (wrong-BLN guesses TCP-RST — NO writes)")
         steps.append(f"Per PXC: Identify handshake (BLN, "
                      f"scanner={placeholder})\n"
-                     f"     trying node1..node20 in slot 2 until one accepts")
+                     "     trying node1..node20 in slot 2 until one accepts")
         steps.append("Per accepted PXC: 0x0050 chain for supervisor name")
         steps.append("Telnet probe per resolved panel")
         steps.append(f"Save site.json → {self.config_path}")
@@ -4116,18 +4118,18 @@ class MainWindow:
             "Cold Discover — confirm",
             f"Run cold discovery on {network} with BLN={bln_display}?\n\n"
             f"What this does:\n{steps_text}\n\n"
-            f"NODE NAME TABLE footprint:\n"
+            "NODE NAME TABLE footprint:\n"
             f"  ONE entry BLN-wide under '{placeholder}' → your IP.\n"
-            f"  (Wrong-BLN probes don't write — TCP RST happens before\n"
-            f"   any application-layer processing. BACnet recon is\n"
-            f"   pure passive UDP listen — zero packets sent.)\n"
-            f"  Cleanup afterward via telnet on any 📡 panel:\n"
+            "  (Wrong-BLN probes don't write — TCP RST happens before\n"
+            "   any application-layer processing. BACnet recon is\n"
+            "   pure passive UDP listen — zero packets sent.)\n"
+            "  Cleanup afterward via telnet on any 📡 panel:\n"
             f"      Fieldpanels dElete {placeholder}\n"
             f"      nodeNametable Remove {placeholder}\n"
-            f"  (delete from Fieldpanels FIRST — reverse order strands\n"
-            f"   the field-panel entry)\n\n"
-            f"Cancel button is in the status bar (bottom-right) while\n"
-            f"discovery runs.\n\n"
+            "  (delete from Fieldpanels FIRST — reverse order strands\n"
+            "   the field-panel entry)\n\n"
+            "Cancel button is in the status bar (bottom-right) while\n"
+            "discovery runs.\n\n"
             f"Time: {time_estimate} depending on subnet + panel count.",
             parent=self.root,
         ):
@@ -4225,10 +4227,10 @@ class MainWindow:
             f"  Scanner name:   {scanner or '—'}\n"
             f"  Panels:         {node_count}\n"
             f"  Telnet open:    {telnet_open}/{len(telnet_map) or node_count}"
-            f"  (📡 = open in tree)\n\n"
-            f"The tree on the left has been refreshed. Use Enumerate FLN "
-            f"on each node to populate devices, or open telnet to any 📡 "
-            f"panel for nodeNametable cleanup.",
+            "  (📡 = open in tree)\n\n"
+            "The tree on the left has been refreshed. Use Enumerate FLN "
+            "on each node to populate devices, or open telnet to any 📡 "
+            "panel for nodeNametable cleanup.",
             parent=self.root,
         )
 
@@ -4305,7 +4307,7 @@ class MainWindow:
             open_count = sum(1 for v in result.values() if v)
             self.log.log(
                 f"Telnet refresh: {open_count}/{len(result)} open "
-                f"(not saved — File → Save Config when ready).",
+                "(not saved — File → Save Config when ready).",
                 level="warn",
             )
 
@@ -4935,7 +4937,7 @@ class MainWindow:
             # where the device-level Verify would simply do nothing.
             self.log.log(
                 f"No enumerated devices for {node['name']} — "
-                f"probing PXC reachability instead…"
+                "probing PXC reachability instead…"
             )
             self._set_busy(f"Probing {node['name']}…")
             self.runner.submit(
