@@ -56,6 +56,33 @@ reconnect and backoff paths are usually the least-tested code it has.
 
 ---
 
+## Running one: the control panel
+
+```
+python virtual_pxc_gui.py
+```
+
+The fixture has no `main()` and no CLI, so until now the only way to bring a
+panel up was to import it and drive it from Python. That suits the tests and
+suits nothing else: the case this exists for is having a panel on a port while
+you develop a client against it, and being able to break that panel on purpose
+while the client is watching.
+
+The panel gives you the identity fields, the three enforcement switches, and
+the fault injection the API already exposes:
+
+| Control | What the client sees |
+|---|---|
+| **Drop connections** | every live socket cut mid-session |
+| **Refuse next 1** | the TCP connect **succeeds**, then the session dies -- what an up-but-not-ready panel does, and what a client mistaking "connected" for "working" spins on |
+| **Push DBCHANGE** | an unsolicited `AP2_DBCHANGE_*` arriving on the session already open |
+
+The status line carries the bound port and the live client count; the pane
+below streams the panel's own log. It drives the existing public API only --
+`virtual_pxc.py` was not changed to accommodate a GUI, and the panel does not
+know the GUI exists. Tkinter is stdlib, so the no-dependency promise holds.
+
+---
 ## Verifying it
 
 ```
