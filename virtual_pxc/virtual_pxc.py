@@ -395,14 +395,28 @@ class VirtualPxc:
             self._accept_thread.join(timeout=2.0)
 
     def _accept_loop(self) -> None:
-        # Not an `assert`: stripped under -O, and this runs in a thread where
-        # the resulting AttributeError would be a silent hang.
-        if self._server_sock is None:
+        # Bind the listener to a local and never re-read the attribute. stop()
+        # closes _server_sock AND sets it to None, so each re-read raced it:
+        # settimeout() and accept() both sat outside any guard and could see a
+        # closed fd (OSError 9) or None (AttributeError). Neither is caught by
+        # the handlers below, so the thread died with an unhandled traceback on
+        # most immediate start/stop cycles -- 173 of 200 measured. The suite
+        # showed it only as PytestUnhandledThreadExceptionWarning, which is
+        # easy to read as noise.
+        #
+        # The None check stays a plain `if` rather than an assert: asserts are
+        # stripped under -O, and in a thread the resulting AttributeError would
+        # be a silent hang.
+        sock = self._server_sock
+        if sock is None:
             return
-        self._server_sock.settimeout(0.5)
+        try:
+            sock.settimeout(0.5)
+        except OSError:
+            return                      # stop() won the race; nothing to do
         while not self._stop_event.is_set():
             try:
-                conn, addr = self._server_sock.accept()
+                conn, addr = sock.accept()
             except socket.timeout:
                 continue
             except OSError:
