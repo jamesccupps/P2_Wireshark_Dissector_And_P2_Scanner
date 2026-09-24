@@ -1233,11 +1233,16 @@ def check_emit_allowed(opcode: int) -> None:
     Deliberately not overridable by a flag: a determined caller can edit the
     source, but nobody does that by accident.
 
-    Coverage, stated honestly: a few standalone helpers (handshake, cold
-    discovery) build raw frames and call sock.sendall directly, bypassing this
-    check. Audited at the time of writing -- the only EBLN opcodes any of them
-    emit are 0x4634 REPL_PULL and 0x4640 PING, both permitted. If you add a
-    raw-frame path, route it through here.
+    Coverage, stated honestly: nine of the ten sendall sites are standalone
+    helpers (handshake, discovery, the listener's ACK) that build raw frames
+    and bypass this check. The only EBLN opcodes any of them emit are 0x4634
+    REPL_PULL and 0x4640 PING, both permitted.
+
+    That used to be a claim with a date on it. tests/test_emit_guard_coverage.py
+    now drives those paths against the virtual PXC, captures what they actually
+    put on the wire, and fails if any of it would be refused here -- so adding
+    a raw-frame path that emits something dangerous breaks a test rather than
+    outdating a comment.
     """
     if opcode is None:
         return
