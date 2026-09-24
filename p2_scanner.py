@@ -7219,11 +7219,22 @@ def parse_routing_table(body: bytes) -> Optional[Dict[str, Any]]:
     return {'entries': entries}
 
 
-def _build_ack_response(msg_type: int, seq: int, req_payload: bytes,
-                       supervisor_name: str, site_name: str) -> bytes:
-    """Build a 39-byte routing-header-only ACK (direction byte 0x01).
+def _build_ack_response(seq: int, req_payload: bytes) -> bytes:
+    """Build a routing-header-only ACK (direction byte 0x01).
 
     The ACK echoes the request's seq and swaps the destination/source names.
+
+    Its msg_type is derived from the ACK's own slots, like every other frame
+    this file builds. It used to be echoed from the request, which gave the
+    right answer -- the ACK reorders the same four strings, so the total does
+    not move -- right up until the request's own msg_type was wrong. Then the
+    listener copied a stranger's framing error into its reply and the ACK was
+    dropped silently at the far end, which is the one outcome a peer with a
+    framing bug can least afford.
+
+    `msg_type`, `supervisor_name` and `site_name` were parameters. The first
+    is now computed; the other two were never read -- the names in the ACK all
+    come from the request's own routing header.
     """
     rh = _parse_routing_header(req_payload)
     if rh is None:
@@ -7241,7 +7252,7 @@ def _build_ack_response(msg_type: int, seq: int, req_payload: bytes,
         bln.encode('ascii') + b'\x00' +
         us.encode('ascii') + b'\x00'
     )
-    return struct.pack('>III', 12 + len(body), msg_type, seq) + body
+    return p2_frame(body, seq)
 
 
 def listen_for_push_notifications(port: int = 5033, duration: Optional[int] = None,
@@ -7418,8 +7429,7 @@ def listen_for_push_notifications(port: int = 5033, duration: Optional[int] = No
 
                     # Send ACK
                     if ack_enabled:
-                        ack = _build_ack_response(msg_type, seq, raw_payload,
-                                                   SCANNER_NAME, P2_SITE)
+                        ack = _build_ack_response(seq, raw_payload)
                         if ack:
                             try:
                                 csock.sendall(ack)
