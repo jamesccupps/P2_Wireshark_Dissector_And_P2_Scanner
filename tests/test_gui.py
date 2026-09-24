@@ -224,3 +224,27 @@ def test_the_main_window_constructs_without_a_config_file(tmp_path, monkeypatch)
         assert win.log_queue is not win.result_queue
     finally:
         root.destroy()
+
+
+def test_task_runner_shutdown_takes_no_unread_parameter():
+    """`shutdown(wait=False)` never read `wait`.
+
+    `_current_thread` was stored in two places to make a join possible and
+    read in none. A parameter that is accepted and ignored is worse than an
+    absent one: the one call site passed `wait=False` as though the choice
+    meant something.
+    """
+    import inspect
+
+    sig = inspect.signature(p2_gui.TaskRunner.shutdown)
+    assert list(sig.parameters) == ["self"]
+
+
+def test_task_runner_keeps_no_handle_it_never_reads():
+    runner = p2_gui.TaskRunner(queue.Queue(), queue.Queue())
+    assert not hasattr(runner, "_current_thread")
+
+    done = threading.Event()
+    assert runner.submit("t", lambda: done.set()) is True
+    assert done.wait(2.0)
+    assert not hasattr(runner, "_current_thread")

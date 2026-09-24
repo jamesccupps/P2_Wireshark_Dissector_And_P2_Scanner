@@ -212,7 +212,6 @@ class TaskRunner:
         self._lock = threading.Lock()
         self._busy = False
         self._current_task: Hashable = None
-        self._current_thread: threading.Thread | None = None
         # threading.Event for cooperative cancel. Long-running scanner
         # functions that take a `stop_event` kwarg can poll this.
         self.stop_event = threading.Event()
@@ -247,7 +246,6 @@ class TaskRunner:
             name=f"p2-worker-{task_id}",
             daemon=True,
         )
-        self._current_thread = t
         t.start()
         return True
 
@@ -297,11 +295,17 @@ class TaskRunner:
                 self._busy = False
                 self._current_task = None
 
-    def shutdown(self, wait: bool = False) -> None:
-        """Signal current task to cancel. Worker is a daemon thread, so
-        the process exits regardless when the main thread ends; this
-        method just sets the cancel flag so well-behaved scanner
-        functions can clean up sockets before the daemon dies.
+    def shutdown(self) -> None:
+        """Signal the current task to cancel.
+
+        The worker is a daemon thread, so the process exits regardless when
+        the main thread ends; this just sets the cancel flag so well-behaved
+        scanner functions can close sockets before the daemon dies.
+
+        It took a `wait` parameter and never read it, with `_current_thread`
+        stored alongside to make a join possible. Nothing ever asked to wait,
+        so both are gone rather than left as a promise the method does not
+        keep.
         """
         self.stop_event.set()
         # No executor to shut down — using bare threading.Thread.
@@ -5946,7 +5950,7 @@ class MainWindow:
         # 1. Signal cooperative cancel so any well-behaved scanner function
         #    can flush state / close sockets cleanly
         try:
-            self.runner.shutdown(wait=False)
+            self.runner.shutdown()
         except Exception:
             pass
         # 2. Destroy the Tk root (closes the window)
