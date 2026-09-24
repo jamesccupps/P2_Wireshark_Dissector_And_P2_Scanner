@@ -7309,27 +7309,41 @@ def listen_for_push_notifications(port: int = 5033, duration: Optional[int] = No
                                     fam = p2_data.opcode_operand(op)
                                     if fam:
                                         event['operand'] = "%s=%s" % (fam[1], fam[2])
+                                # A body that will not parse is still a frame that arrived, and for a
+                                # diagnostic listener the arrival is the observation. Each arm below
+                                # fell through silently when its parser returned None, so the frame was
+                                # dropped with no record at all -- indistinguishable from one that never
+                                # came. 'undecoded' keeps the routing header, the opcode and the peer,
+                                # which is what a reader needs in order to chase it.
                                 if op_bytes == P2Message.MARKER_VALUE_PUSH:
                                     parsed = parse_cov_notification(body)
                                     if parsed:
                                         event['event'] = 'cov'
                                         event.update(parsed)
+                                    else:
+                                        event['event'] = 'undecoded'
                                 elif op_bytes == P2Message.MARKER_WRITE_QUAL:
                                     parsed = parse_write_with_quality(body)
                                     if parsed:
                                         event['event'] = 'virtual_push'
                                         event.update(parsed)
+                                    else:
+                                        event['event'] = 'undecoded'
                                 elif op_bytes == P2Message.MARKER_ROUTING_TBL:
                                     parsed = parse_routing_table(body)
                                     if parsed:
                                         event['event'] = 'routing_table'
                                         event['peer_count'] = len(parsed.get('entries', []))
                                         event['entries'] = parsed['entries']
+                                    else:
+                                        event['event'] = 'undecoded'
                                 elif op_bytes == P2Message.MARKER_ALARM_REPORT:
                                     parsed = parse_alarm_report(body)
                                     if parsed:
                                         event['event'] = 'alarm'
                                         event.update(parsed)
+                                    else:
+                                        event['event'] = 'undecoded'
                                 else:
                                     event['event'] = 'unknown_opcode'
                         elif dir_byte == 0x05:

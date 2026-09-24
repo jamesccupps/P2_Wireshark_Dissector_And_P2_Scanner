@@ -114,6 +114,22 @@ def test_a_well_formed_cov_push_is_emitted(tmp_path):
     assert ev["value"] == pytest.approx(72.5)
 
 
+def test_a_push_whose_body_will_not_parse_still_leaves_a_record(tmp_path):
+    """Each marker arm fell through silently when its parser returned None, so
+    a malformed COV push vanished with no record -- which a reader cannot tell
+    apart from a frame that never arrived. The arrival is itself the
+    observation worth keeping, separate from whether the body decoded."""
+    short = b"\x02\x74" + struct.pack(">H", 1)    # right opcode, body too short
+    events = _listen_once(tmp_path, _frame(short))
+    assert events, "an undecodable COV push produced no event at all"
+    ev = events[0]
+    assert ev["event"] == "undecoded"
+    # the parts that did decode must survive, or the record is not chaseable
+    assert ev["opcode"] == "0x0274"
+    assert ev["src_node"] == PANEL
+    assert ev["bln"] == BLN
+
+
 def test_an_error_response_is_reported_rather_than_silently_dropped(tmp_path):
     """dir=0x05 was nested inside `if dir_byte == 0x00`, so it was unreachable
     even once the type was corrected. A panel error must leave a record."""
