@@ -1087,7 +1087,7 @@ than protocol: the Transport Server Port is set in a **LocalNet Configuration
 Utility** rather than per panel, and **changing a panel's detected DNS suffix
 coldstarts it** — a configuration edit with a service interruption behind it.
 A node identifier is additionally barred from containing **periods or
-punctuation**, alongside the 15-character limit already recorded in §5.3. [D]
+punctuation**, alongside the 15-character limit already recorded in §3.3.2. [D]
 
 #### 4.1.1 The rest of the port surface a panel presents
 
@@ -9051,7 +9051,7 @@ load-bearing for a client.** Checked against **360,839** name-like strings on
 the wire: 89 of the words below never appear as a name — and **`ALARM` does**,
 eight times, both as a point `name` and as a `last_name` enumeration cursor. The
 frames are ordinary panel and supervisor traffic, not this project's probes
-(§99.1). [W]
+(§6.2.2). [W]
 
 A point called `ALARM` therefore exists and the panel enumerates it happily.
 What the rule means is that a *program* cannot write `ALARM` to refer to that
@@ -10482,7 +10482,7 @@ guessable from the wire: [S]
   the **PXC-class images (PPC, PXCC, PXCM)**, which ship *inside* a supervisor
   DLL rather than as standalone files and decode at 17–27% density with `blr`
   rates of 0.30–0.39. So the lineage spans two instruction sets, which is
-  exactly why §22.4's dispatch table being byte-identical across both is
+  exactly why the §9.4.1 opcode table being byte-identical across both is
   evidence that it is protocol *data* rather than compiled code.
 - **A third of the images are packed** and decode as neither architecture. The
   split is not by family but by revision: `FLNC2p5`/`MBC2p5` decode at 34%,

@@ -2220,7 +2220,7 @@ HELP_SECTIONS: List[Tuple[str, str]] = [
           "virtual-write / routing events). See the main p2_scanner "
           "README for the full flag list and safety notes."),
     ("p", "Cold-discover now bootstraps via a 0x0050 Status Query (spec "
-          "§22.6) — one round-trip per panel returns BLN name, node name, "
+          "§17.3) — one round-trip per panel returns BLN name, node name, "
           "and supervisor identity from both legacy and modern firmware. "
           "Older builds of the scanner guessed this frame field from a "
           "small set of values and could fail on sites whose node names "

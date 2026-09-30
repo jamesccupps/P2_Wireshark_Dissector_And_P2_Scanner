@@ -340,7 +340,8 @@ def load_config(filepath: str) -> bool:
     """Load P2 network config from a JSON file.
 
     Populates the firmware_registry build-tag cache from ``known_builds``
-    when present; this enables the §30.4 fast-path on first contact.
+    when present, so the platform -- and therefore the name codec of §16.5
+    -- is known before the first identity read rather than after it.
     Unknown fields are tolerated (forward compat).
     """
     global P2_NETWORK, P2_SITE, SCANNER_NAME
@@ -5501,7 +5502,7 @@ def _cold_status_query_probe(host: str, scanner_name: str,
     the role-swapped routing header, plus the supervisor identity it
     expects as an LP-string in the body after the SYST scope footer.
 
-    Far cheaper than the Cartesian attack (§22.1) — one request gives us
+    Far cheaper than the Cartesian attack — one request gives us
     BLN + panel name + supervisor name. Strict-peer-list panels reject
     this the same way they reject IdentifyBlock; in that case the caller
     falls through to Cartesian.
@@ -5532,7 +5533,8 @@ def _cold_status_query_probe(host: str, scanner_name: str,
                + bln_b + b'\x00'
                + scanner_b + b'\x00')
 
-    # 0x0050 body per §22.6: opcode + 1-byte TLV "SYST" + SYST separator + wildcard.
+    # 0x0050 body: opcode, then the §8.2 scope tag — a "SYST" string TLV
+    # followed by the 5-byte <scope_byte> 3F FF FF FF selector.
     body = b'\x00\x50\x01\x00\x04SYST\x23\x3f\xff\xff\xff'
     payload = routing + body
     seq = secrets.randbits(24)
@@ -5786,7 +5788,7 @@ def cold_discover_site(ranges: Optional[List[str]] = None,
     # — far cheaper than the Cartesian attack in Phase 3. Strict-peer-list
     # panels reject this the same way they reject IdentifyBlock; we fall
     # through to Phase 3 if every host silent-drops.
-    print("\n  PHASE 2c: 0x0050 status-query bootstrap (§22.6)")
+    print("\n  PHASE 2c: 0x0050 status-query bootstrap (§17.3)")
     bootstrap_scanner = (f"{prefixes[0].upper()}DCC-SVR|5033" if prefixes
                          else "P2SCAN-LAP|5033")
     bootstrap_hits: Dict[str, Dict[str, Any]] = {}
