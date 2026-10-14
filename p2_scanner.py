@@ -1916,11 +1916,11 @@ class P2Connection:
         Cursor advancement strategy:
             Normally the panel returns the next point alphabetically after the
             cursor. When the cursor matches a point name that has a compound
-            identity (device + subkey, e.g. "BCCW" + "DAY.NGT"), the panel
+            identity (device + subkey, e.g. "AHU1" + "DAY.NGT"), the panel
             sometimes returns the same record again because its internal index
             uses the compound key and our single-name cursor doesn't advance
             past it. Detection: if we get the same device name back, try
-            incrementing the last byte of the cursor (e.g. "BCCW" → "BCCX"),
+            incrementing the last byte of the cursor (e.g. "AHU1" → "AHU2"),
             which forces the panel to skip past the stuck entry and return
             whatever comes next alphabetically. Give up after several such
             retries to avoid infinite loops on genuinely-empty panels.
@@ -1956,17 +1956,17 @@ class P2Connection:
 
             Strategy order (minimal advance first to preserve adjacent points):
               1. Append 0x01 — `cur + \\x01` is the smallest string > cur.
-                 Example: "DIVV1" → "DIVV1\\x01"
-                 Returns the next entry after "DIVV1", which could be
-                 "DIVV10.STPT", "DIVV1T", or any longer prefix match.
+                 Example: "VAV102" → "VAV102\\x01"
+                 Returns the next entry after "VAV102", which could be
+                 "VAV102-WEST", "VAV102A", or any longer prefix match.
               2. Append ' ' (0x20) — space, first printable byte.
               3. Append '0' (0x30) — matches numeric-suffix points.
               4. Append 'A' (0x41) — matches alpha-suffix points.
               5. Append 'a' (0x61) — matches lowercase-suffix points.
               6. Append '~' (0x7E) — jumps past all printable-suffix entries
                  that start with cur.
-              7. Byte-increment last character — "DIVV1" → "DIVV2".
-                 This is a big jump that skips everything with prefix "DIVV1".
+              7. Byte-increment last character — "VAV102" → "VAV103".
+                 This is a big jump that skips everything with prefix "VAV102".
                  Only used as a last resort when all appends stall.
               8. Increment + append space — last-ditch attempt.
 
@@ -1996,7 +1996,7 @@ class P2Connection:
 
             if dev_name in seen_devices:
                 # Cursor stalled — panel returned a record we've already seen.
-                # This commonly happens on compound-identity points (e.g. BCCW
+                # This commonly happens on compound-identity points (e.g. AHU1
                 # with subkey DAY.NGT) where our single-name cursor can't
                 # advance past the compound record.
                 #

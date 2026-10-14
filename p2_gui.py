@@ -2167,7 +2167,7 @@ HELP_SECTIONS: List[Tuple[str, str]] = [
            "walks of the same panel across time to see what came and "
            "went."),
     ("p", "Subkeys: some PXC points use a compound identity — two name "
-          "fields (e.g. BCCW / DAY.NGT) where a normal point has one. "
+          "fields (e.g. AHU1 / DAY.NGT) where a normal point has one. "
           "The Subkey column is the second field, empty for normal "
           "points. When diffing walks, entries are matched by (device, "
           "subkey, point) so compound entries don't collide."),
@@ -2851,7 +2851,7 @@ class CompareWindow(tk.Toplevel):
     def _render_walk(self, changed_only: bool) -> None:
         """Diff two Walk All Points runs on the same node. Entries are keyed
         by (device, subkey, point) — the subkey disambiguates compound-name
-        entries where the same device has multiple records (e.g. BCCW has
+        entries where the same device has multiple records (e.g. AHU1 has
         one entry per PPCL variable attached to it)."""
 
         def key(e: Dict) -> Tuple[str, str, str]:

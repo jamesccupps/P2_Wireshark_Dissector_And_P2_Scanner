@@ -376,7 +376,7 @@ def main() -> int:
 
             # New point — apply profile filter before allocating anything.
             # Panel-internal points are NEVER filtered by profile: their
-            # names are PPCL variable codes (A04SPS, AC04DA) that don't
+            # names are PPCL variable codes (AHU1SP, AHU1DA) that don't
             # match descriptive profile patterns, but the points themselves
             # are operationally curated (the panel only surfaces what its
             # PPCL programs reference). Filtering them by name would

@@ -89,9 +89,8 @@ class PointEntry:
     poll_interval_s: int = 60
     enabled: bool = True
     # Human-readable description of the parent device — populated from the
-    # PXC's FLN enumerate response (e.g. "K408 — CONFERENCE", "DIVV1 — DIRIG
-    # CONF"). Operators recognize spaces by these names; the BACnet device-name
-    # alone (DIVV1) is meaningless to anyone who didn't commission the panel.
+    # PXC's FLN enumerate response (e.g. "VAV101 — ROOM 101", "VAV102 — CONF ROOM B"). Operators recognize spaces by these names; the BACnet device-name
+    # alone (VAV102) is meaningless to anyone who didn't commission the panel.
     # Default empty for backwards compatibility with manifests built before
     # this field existed.
     device_description: str = ""

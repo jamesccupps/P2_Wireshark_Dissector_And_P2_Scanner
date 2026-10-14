@@ -10180,10 +10180,11 @@ proof delay. [S]
 At least one vendor-produced point-model export ignores that split and prints
 all four range columns for every point. On a digital point the values it prints
 are the descriptor string's own bytes read as little-endian floats: a point
-described `MECH COOLING` exports a signal-low of 199957.203125, which is the
-ASCII bytes `4D 45 43 48`. Every such row in the sample behaves this way. The
-values are not a wrong reading of a real field — they are a reading of a field
-that does not exist on that point. [W/S]
+described `EXAMPLE PT 1` would export a signal-low of 202736720.0, which is the
+ASCII bytes `45 58 41 4D` (illustrative: the sample's own descriptors are site
+data). Every such row in the sample behaves this way. The values are not a
+wrong reading of a real field — they are a reading of a field that does not
+exist on that point. [W/S]
 
 The consequence for anyone writing a tool: **those four columns are not
 measurements on digital points**, and they are plausible enough to pass a sanity

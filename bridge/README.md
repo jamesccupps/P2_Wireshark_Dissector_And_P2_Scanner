@@ -23,7 +23,7 @@ Built on the P2 Scanner library in the root of this repository, which does the a
 - Propagates the panel's `#COM` indicator to BACnet `reliability=NO_OUTPUT` + fault status flag, so supervisors light up red the same way Desigo CC does
 - Maps APOGEE engineering unit strings (`DEG F`, `CFM`, `INWC`, etc.) to BACnet `EngineeringUnits` enum values
 - Maps digital point on/off labels (`NIGHT`/`DAY`, `OCCUPIED`/`UNOCC`, etc.) to BACnet `activeText` / `inactiveText`
-- Bakes the device description into each BACnet object's description field (so `NODE1.108.ROOM_TEMP` shows up as `CONFERENCE · slot 4, app 2500, DEG F` — what room it is, then technical context)
+- Bakes the device description into each BACnet object's description field (so `NODE1.108.ROOM_TEMP` shows up as `ROOM 101 · slot 4, app 2500, DEG F` — what room it is, then technical context)
 
 ---
 
