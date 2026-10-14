@@ -11,7 +11,7 @@ does not model is in `README.md`, stated rather than implied.
     0x0100  SystemInfo legacy (also used as mid-session EPing response)
 
   Reads
-    0x0271  ReadProperty (legacy)
+    0x0271  COV_ENABLE -- answered with the point; the subscription is NOT modelled
     0x0220  ReadShort (modern variant — accepted on legacy panels too)
     0x0294  SYST property read by hierarchical path
     0x5003  ScheduleObjectInfo
@@ -101,7 +101,7 @@ DIR_ERROR   = 0x05
 OP_STATUS_QUERY        = 0x0050
 OP_SYSTEM_INFO_LEGACY  = 0x0100
 OP_SYSTEM_INFO_COMPACT = 0x010C
-OP_READ_LEGACY         = 0x0271
+OP_COV_ENABLE          = 0x0271   # was OP_READ_LEGACY; PROTOCOL.md §9.3 withdrew that reading
 OP_READ_SHORT          = 0x0220
 OP_WRITE_QUALITY       = 0x0240
 OP_PROPERTY_READ_PATH  = 0x0294
@@ -609,7 +609,7 @@ class VirtualPxc:
             OP_SYSTEM_INFO_LEGACY:  self._handle_sysinfo_legacy,
             OP_SERVICES_RENDERED:   self._handle_services_rendered,
             OP_STATUS_QUERY:        self._handle_status_query,
-            OP_READ_LEGACY:         self._handle_read,
+            OP_COV_ENABLE:          self._handle_read,
             OP_READ_SHORT:          self._handle_read,
             OP_WRITE_QUALITY:       self._handle_write_0x0240,
             OP_BULK_WRITE:          self._handle_write_0x4222,
@@ -954,9 +954,15 @@ class VirtualPxc:
 
     def _handle_read(self, msg_type: int, seq: int,
                       scanner: str, body: bytes) -> bytes:
-        """0x0271 / 0x0220 — read a point. Body shape:
+        """0x0271 / 0x0220 — answer with a point's value. Body shape:
         00 00 [TLV device_name] [TLV point_name] ...
-        Response carries the point value block, PROTOCOL.md §10.4."""
+        Response carries the point value block, PROTOCOL.md §10.4.
+
+        0x0271 is AP2_COV_ENABLE. A real panel answers it with the point AND
+        arms a change-of-value subscription, then pushes 0x0274 when the value
+        changes. This fixture does only the first half, so a client's
+        subscription behaviour -- including re-arming on every poll -- cannot
+        be tested against it. verify.py lists that gap."""
         strings = _parse_lp_strings(body)
         if len(strings) < 2:
             # Some reads carry scope first (e.g. 0x0220 NONE-scope read-back

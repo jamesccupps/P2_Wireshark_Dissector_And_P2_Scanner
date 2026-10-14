@@ -941,9 +941,14 @@ class P2Message:
 
     # Opcode / marker constants (big-endian 16-bit opcodes live inside 0x33/0x34 payloads)
     OP_IDENTIFY        = 0x4640  # mid-session identity refresh
-    OP_READ_EXTENDED   = 0x0271  # point read (extended form)
+    # 0x0271 / 0x0273 are the COV subscription pair (PROTOCOL.md §9.3, §12.1).
+    # They were named OP_READ_EXTENDED and OP_WRITE_NOVALUE here long after the
+    # document withdrew both readings. read_point() sends 0x0271: its response
+    # carries the whole point, which is why it works as a read -- and why every
+    # read also subscribes.
+    OP_COV_ENABLE      = 0x0271  # AP2_COV_ENABLE: arms a change-of-value subscription
     OP_READ_SHORT      = 0x0220  # point read (short form)
-    OP_WRITE_NOVALUE   = 0x0273  # Desigo's UI point-existence probe (dominant use, 500x more common than alarm-ack); also AlarmAckTrigger before 0x0509
+    OP_COV_DISABLE     = 0x0273  # AP2_COV_DISABLE: disarms it. Never emitted by this tool
     OP_VALUE_PUSH      = 0x0274  # bidirectional: DCC->PXC virtual-write, or PXC->DCC COV
     OP_WRITE_QUALITY   = 0x0240  # WriteWithQuality. 5034 PXC->DCC NONE/sep=0x00 (ACK'd) vs 5033 DCC->PXC SYST/sep=0x23 (errors 0x0E15 — Desigo retries with 0x4222)
     OP_ENUM_FLN        = 0x0986  # enumerate FLN devices
@@ -1549,6 +1554,18 @@ class P2Connection:
                    node_name: str = "node") -> Optional[Dict[str, Any]]:
         """
         Read a single point value from a TEC device.
+
+        This sends 0x0271 AP2_COV_ENABLE, not a plain read. The enable
+        response carries the whole point object, so the value comes back --
+        but the panel also arms a change-of-value subscription and will push
+        0x0274 annunciations on this connection whenever the point changes
+        (PROTOCOL.md §12.1). The subscription ends with the TCP session
+        (§12.1.1), and nothing here sends 0x0273 to disarm it sooner.
+
+        For a short scan that is the whole footprint. A caller that holds one
+        connection and reads the same point repeatedly re-arms it on every
+        call, and whether a panel treats a repeat enable as idempotent has
+        never been observed. 0x0220 AP2_POINT_LOG_VALUE is the plain read.
 
         Args:
             device: TEC device name (e.g., "DEVICE1")

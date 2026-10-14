@@ -464,6 +464,13 @@ secret). That makes this tooling powerful and easy to misuse, so:
 - **Active discovery leaves a footprint.** A correct-BLN handshake registers the scanner's
   identity as a permanent node-table entry on the panel (this is how P2 registration
   works). Prefer the passive push-listener and the dissector when you only need to observe.
+- **A point read is also a subscription.** The scanner reads a point with `0x0271
+  AP2_COV_ENABLE`, whose response carries the point's value — and which also arms a
+  change-of-value subscription for the life of the TCP session (`PROTOCOL.md` §12.1). It
+  never sends `0x0273` to disarm one. A scan's subscriptions end at disconnect; the bridge holds
+  one connection open and re-arms every point on each poll, and whether a panel treats a
+  repeat enable as idempotent has not been observed — weigh that before running it for
+  weeks against a panel you depend on.
 - **Rate-limit and avoid production disruption.** Use inter-request delays, a single
   connection per panel, and do not run scans against life-safety or revenue-critical
   systems outside a maintenance window. The replication-class opcodes can stall a panel.
