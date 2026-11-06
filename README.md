@@ -490,7 +490,9 @@ decoders, and edge-case fixes.
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See `LICENSE`. `p2.lua` is additionally offered under GPL-2.0-or-later
+(SPDX `MIT OR GPL-2.0-or-later`), because Wireshark's Lua documentation says code
+using its Lua bindings must be distributed under the GPL's terms.
 
 This dissector is a third-party analytical tool built from observed traffic for owner-
 operators of their own equipment. It is not affiliated with or endorsed by Siemens.

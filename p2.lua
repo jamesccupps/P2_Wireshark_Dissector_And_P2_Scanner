@@ -1,4 +1,8 @@
 -- p2.lua — Siemens APOGEE P2 (Protocol II) Wireshark dissector
+-- SPDX-License-Identifier: MIT OR GPL-2.0-or-later
+--   MIT is the repository's licence. GPL-2.0-or-later is offered as well because
+--   Wireshark's Lua documentation says code using its Lua bindings must be
+--   distributed under the GPL's terms. MIT already permits that; this says so.
 -- Version: see P2_DISSECTOR_VERSION below (2.10.0). The changelog in this header
 -- ends at 2.8; later releases are recorded in CHANGELOG.md.
 --
