@@ -1,5 +1,6 @@
 -- p2.lua — Siemens APOGEE P2 (Protocol II) Wireshark dissector
--- Version: 2.8  (2026-08-25)  -- the two EQS records decoded in full
+-- Version: see P2_DISSECTOR_VERSION below (2.10.0). The changelog in this header
+-- ends at 2.8; later releases are recorded in CHANGELOG.md.
 --
 -- Changelog
 --   2.8  The two EQS upload records decoded in full.
