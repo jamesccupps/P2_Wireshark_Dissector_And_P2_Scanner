@@ -19,6 +19,10 @@ bridge/site.json
 *.pcap
 *.pcapng
 *.cap
+# ...except the one synthetic sample, which make_sample_capture.py builds from the
+# virtual PXC's fixture names and RFC 5737 addresses. Name it exactly: a
+# directory-wide exception would let a real capture dropped beside it through.
+!captures/p2_virtual_pxc_sample.pcap
 
 # Scanner output
 *.csv
