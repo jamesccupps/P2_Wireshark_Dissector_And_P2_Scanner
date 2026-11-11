@@ -4,7 +4,7 @@ Thanks for considering a contribution. The short version: bug reports, real-worl
 
 ## Filing a bug report
 
-Use the [issue templates](https://github.com/jamesccupps/p2_bacnet_bridge/issues/new/choose). At minimum include:
+Open an [issue](https://github.com/jamesccupps/P2_Wireshark_Dissector_And_P2_Scanner/issues/new). At minimum include:
 
 - The exact bridge version (visible in the GUI title bar or in `p2_bridge/__init__.py`)
 - Your Python version and OS (`python --version` + Windows/Linux/macOS)

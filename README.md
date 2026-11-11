@@ -1,5 +1,11 @@
 # Siemens APOGEE P2 (Protocol II)
 
+[![tests](https://github.com/jamesccupps/P2_Wireshark_Dissector_And_P2_Scanner/actions/workflows/tests.yml/badge.svg)](https://github.com/jamesccupps/P2_Wireshark_Dissector_And_P2_Scanner/actions/workflows/tests.yml)
+[![Latest release](https://img.shields.io/github/v/release/jamesccupps/P2_Wireshark_Dissector_And_P2_Scanner?label=release)](https://github.com/jamesccupps/P2_Wireshark_Dissector_And_P2_Scanner/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+**Protocol reference on the web: [jamesccupps.github.io/p2](https://jamesccupps.github.io/p2/)**
+
 Tools and a technical reference for **P2 ("Protocol II")**, the Siemens APOGEE
 building-automation protocol over TCP — for owner-operators working with their own legacy
 equipment:
@@ -18,6 +24,10 @@ equipment:
 
 The dissector is built and validated from wire captures; the opcode names are the
 protocol's AP2 function-code vocabulary.
+
+![Wireshark with p2.lua: a point read answered by a panel, decoded down to the device, point name, room and engineering units](docs/images/wireshark-p2.png)
+
+<sub>A capture of `p2_scanner.py` reading the virtual PXC panel on loopback (fictional BLN, node and points), opened in Wireshark with `p2.lua`.</sub>
 
 > **v2.10.0 — a virtual panel you can develop against, and a BACnet bridge.**
 > [`virtual_pxc/`](virtual_pxc/) is a virtual APOGEE panel that **refuses what a
