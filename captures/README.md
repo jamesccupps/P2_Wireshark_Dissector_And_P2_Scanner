@@ -28,7 +28,7 @@ administered MACs. Every name comes from `virtual_pxc/fixtures.json`: BLN
 standard TEC point names. The scanner identifies itself as `P2SCAN-LAP|5033`.
 
 A real capture can't stand in for this one. The BLN name is in the first
-routing slot of every frame, and IP/MAC anonymisers don't touch payload strings.
+routing slot of every frame, and IP/MAC anonymizers don't touch payload strings.
 
 ## What's in it
 

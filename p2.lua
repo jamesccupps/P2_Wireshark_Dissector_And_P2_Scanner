@@ -1,9 +1,9 @@
 -- p2.lua — Siemens APOGEE P2 (Protocol II) Wireshark dissector
 -- SPDX-License-Identifier: MIT OR GPL-2.0-or-later
---   MIT is the repository's licence. GPL-2.0-or-later is offered as well because
+--   MIT is the repository's license. GPL-2.0-or-later is offered as well because
 --   Wireshark's Lua documentation says code using its Lua bindings must be
 --   distributed under the GPL's terms. MIT already permits that; this says so.
--- Version: see P2_DISSECTOR_VERSION below (2.10.0). The changelog in this header
+-- Version: see P2_DISSECTOR_VERSION below (2.11.0). The changelog in this header
 -- ends at 2.8; later releases are recorded in CHANGELOG.md.
 --
 -- Changelog
@@ -1921,7 +1921,7 @@ end
 -- versions independently (p2_scanner.__version__). History is in the Changelog
 -- comment block at the top of this file. Keep it in step with that block: a
 -- capture saved by an unknown build is only identifiable if this is honest.
-local P2_DISSECTOR_VERSION = "2.10.0"
+local P2_DISSECTOR_VERSION = "2.11.0"
 local P2_MIN_FRAME_LEN = 17   -- PROTOCOL.md 6.1.1; matches p2_scanner.P2_MIN_FRAME_LEN
 
 local p2 = Proto("p2", "Siemens APOGEE P2 (Protocol II) v" .. P2_DISSECTOR_VERSION)

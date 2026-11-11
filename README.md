@@ -29,6 +29,14 @@ protocol's AP2 function-code vocabulary.
 
 <sub>A capture of `p2_scanner.py` reading the virtual PXC panel on loopback (fictional BLN, node and points), opened in Wireshark with `p2.lua`.</sub>
 
+> **v2.11.0 — cold discovery was framing most of its probes wrong.** Three
+> frame builders hard-coded the header's `msg_type` instead of computing it from
+> the routing slots, so a real panel silently dropped most candidate node names
+> and the scanner reported "no panel answered". Also: an outside audit's fixes,
+> a point read correctly named as the COV subscription it is, a control panel
+> for the virtual PXC, and a [synthetic sample capture](captures/) to try the
+> dissector on. **Some constants were renamed** — see the [changelog](CHANGELOG.md).
+>
 > **v2.10.0 — a virtual panel you can develop against, and a BACnet bridge.**
 > [`virtual_pxc/`](virtual_pxc/) is a virtual APOGEE panel that **refuses what a
 > real panel refuses**: it validates `msg_type` as `13 + routing-slot bytes` and
@@ -41,7 +49,7 @@ protocol's AP2 function-code vocabulary.
 > rather than passing over it. [`bridge/`](bridge/) is a read-only P2 → BACnet/IP
 > bridge; `bacpypes3` lives in `bridge/requirements.txt` and never at the
 > repository root, so cloning this repo for the scanner alone still installs
-> nothing. First CI too, now **219 tests** across three jobs on Python
+> nothing. First CI too, now **223 tests** across three jobs on Python
 > 3.10–3.13 — every public tool here is under test, the GUI thinly.
 >
 > **Also in 2.10.0 — `PROTOCOL.md` §14 was wrong about 9.3% of PPCL.** It said

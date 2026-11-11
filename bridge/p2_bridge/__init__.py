@@ -8,4 +8,4 @@ etc.) can read them as native BACnet.
 Read-only by design — matches the safety stance of the underlying P2 Scanner.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

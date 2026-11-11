@@ -1,6 +1,118 @@
 # Changelog
 
-## Unreleased
+## v2.11.0 — an outside audit, and a probe that framed itself wrong (2026-11-11)
+
+Nearly sixty commits since 2.10.1. Cold discovery was building most of its
+probes with the wrong header; an outside audit of the repository found most of
+the rest; and a point read turned out to be a subscription. Also new: a control
+panel for the virtual PXC, a synthetic sample capture, and the protocol
+reference on its own web page, [jamesccupps.github.io/p2](https://jamesccupps.github.io/p2/).
+
+**Versions:** toolkit and `p2.lua` 2.11.0 · `p2_scanner` 1.5.0 · bridge 0.5.0.
+
+**Renamed: update code that imports these.** `P2Message.OP_READ_EXTENDED` is now
+`OP_COV_ENABLE`; `P2Message.OP_WRITE_NOVALUE` is now `OP_COV_DISABLE`;
+`virtual_pxc.OP_READ_LEGACY` is now `OP_COV_ENABLE`. `p2_gui.TaskRunner.shutdown()`
+no longer takes `wait`, which it never read.
+
+### `p2_scanner.py`: three frame builders chose `msg_type` instead of computing it
+
+`msg_type` is `13 +` the routing-slot bytes (§6.2), and a panel drops a frame
+whose header disagrees with its slots, without saying so. `p2_frame()` exists to
+compute it. Three builders — the heartbeat sweep, `_cold_probe`, and cold
+discovery's `0x010C` follow-up — hard-coded `0x33` instead, which is right only
+when the four slots happen to total 38 bytes. `_cold_probe` deliberately varies
+the length of the node names it tries, so most of its probes were built wrong
+and came back `rejected_silent`, which reads as "no panel answered". The virtual
+PXC dropped all four test names before the fix and answers them after it. A test
+now fails if a literal ever appears in a frame header's `msg_type` slot.
+
+### A point read is a COV subscription
+
+`read_point()` sends `0x0271`, which §9.3 had long since identified as
+`AP2_COV_ENABLE` rather than a plain read: the response carries the whole point,
+and the panel also arms a change-of-value subscription for the rest of the TCP
+session (§12.1.1). The scanner and the virtual PXC still named it as a read, and
+`0x0273`, the matching `COV_DISABLE`, was named as a write and never sent. The
+names now match the catalog, `read_point()` says what it sends, and the README's
+footprint section says that a read subscribes.
+
+**Behavior is unchanged.** The bridge re-arms every point on each poll over one
+long-lived session, and whether a panel treats a repeat enable as idempotent has
+not been observed. `0x0220 AP2_POINT_LOG_VALUE` is the plain read.
+
+### An outside audit of the repository
+
+- `--listen-push` decoded nothing: a direction test compared a one-byte slice
+  with an integer.
+- `--cold-discover` raised `NameError` whenever its probe *succeeded*.
+- The virtual PXC's accept thread died on 173 of 200 shutdowns.
+- A push whose body did not parse vanished; it is now reported as `undecoded`.
+- `_recv_one_frame`'s `overall_timeout` bounded each `recv`, not the frame, so a
+  peer sending one byte just inside the interval could hold it open
+  indefinitely. It is a deadline now.
+- `_recv_one_frame` read up to 4,096 bytes to get a 4-byte length prefix and
+  dropped whatever followed. On the socket `enumerate_fln_devices` reuses, that
+  was the next frame's header.
+- `P2Message.from_bytes` sliced with the header's length, so a short frame came
+  back truncated instead of refused.
+- The push listener's ACK echoed the peer's `msg_type`, so a client with a
+  framing bug got a misframed ACK back.
+- The minimum frame length was 12 in six places in the scanner and 13 in
+  `p2.lua`; §6.1.1 says 17. Both now use one named constant.
+- The emit guard sees one of ten send paths. That was a documented claim; it is
+  now a test that drives every raw path against the virtual PXC.
+- One finding is not a defect and is recorded as such: the predicted race on
+  the build-tag cache cannot occur on a GIL build. It is kept as a test, which
+  is where a free-threaded interpreter would show it.
+- 129 placeholder-free f-strings and a little unreachable code removed; pyflakes
+  is clean on the scanner.
+
+### `virtual_pxc/`: a control panel, and the capability document
+
+`virtual_pxc_gui.py` runs the fixture panel from a window: identity, the three
+enforcement switches, fault injection, and a live log. Before this the fixture
+had no entry point at all. It also serves `0x010D`, the panel capability
+document.
+
+### `captures/`: a sample capture to try the dissector on
+
+`p2_virtual_pxc_sample.pcap` is the scanner talking to the virtual PXC, recorded
+write by write and wrapped in synthetic Ethernet, IPv4 and TCP on RFC 5737
+addresses. 112 frames; Wireshark verifies every checksum, and `p2.lua` dissects
+all 47 P2 frames. `captures/make_sample_capture.py` regenerates it byte for byte.
+
+### `p2.lua`
+
+- Offered under `MIT OR GPL-2.0-or-later` (SPDX header), because Wireshark's Lua
+  documentation says Lua code that uses its bindings must be distributed under
+  the GPL's terms. Every other file stays MIT.
+- The 17-byte minimum frame length (above).
+- Reports 2.11.0. At the 2.10.1 tag it still reported 2.9.
+
+### `PROTOCOL.md`
+
+- §1.2.1 — the life-safety network is out of scope, and why.
+- §4.1, §4.1.1 — the rest of the port surface a panel presents; Soft
+  Controllers are identified by port, not node name.
+- §4.4, §16.4.1 — FLN LAN numbering; the panel capability document, observed;
+  a capability set of twenty, a floor that did not move across 151 documents;
+  two more platforms; RENO is Remote Notification, and its flag reads inverted.
+- §7.2.2, §8.1, §8.5, §9.1.1, §9.5.3, §10.4.1, §11, §11.5.1.2 — corrections and
+  additions: textType is a declared enum, twenty-six opcodes named from a
+  display-string pool, the proof delay is in seconds, and a point type with no
+  default enumeration is not thereby analog.
+- Prior art: what is public about P1 and P2, and what is not.
+- Five section references pointed at a section that does not exist; they are
+  repointed. One had kept a term §9.4.1 retracts.
+- Worked examples in code comments, docstrings and §16.2.1 now use synthetic
+  names throughout.
+
+### Docs
+
+A Wireshark screenshot, badges and the web reference in the README; a dead link
+in `bridge/CONTRIBUTING.md` fixed; US spelling; test counts corrected. **223
+tests** across three jobs (132 scanner, 22 virtual PXC, 69 bridge).
 
 ### `PROTOCOL.md` §10.9.1 — the opcodes with no declared structure
 
