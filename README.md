@@ -76,7 +76,7 @@ Click a P2 packet and get:
 - **Frame header** — total length, header length (checked against the slots the
   frame actually carries, and flagged on a mismatch), sequence, direction
 - **Routing slots** — the four NUL-terminated ASCII slots `[BLN, dst-node, BLN, src-node]`
-- **Opcode** — the 2-byte AP2 function code, labelled against the full
+- **Opcode** — the 2-byte AP2 function code, labeled against the full
   name set; an opcode that isn't a defined function code shows as `unknown_0x….`
 - **Operand** (`p2.operand`) — many opcodes are one operation with a parameter
   encoded in the opcode rather than the body, so a run of consecutive codes is an
@@ -412,7 +412,7 @@ refuses.** A fixture that answers everything proves nothing:
 - **It talks first.** `push_dbchange()` sends an unsolicited `AP2_DBCHANGE_*`
   notification on the already-open session — a peer announcing a database change —
   in the shape measured on the wire: direction byte, four routing slots, opcode,
-  no body. A client waiting on a reply has to recognise it and carry on.
+  no body. A client waiting on a reply has to recognize it and carry on.
 - **It can fail on purpose.** `drop_connections()` cuts every live socket;
   `refuse_connections(n)` accepts and immediately closes the next *n*, which is what a
   panel that is up but not ready does. A client's reconnect and backoff paths are usually
