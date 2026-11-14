@@ -1306,7 +1306,7 @@ even though its contents are not available. [D]
 
 > **[OPEN, PARTLY ANSWERED] Serial-BLN P2 link framing bytes.** Only the line parameters (8/N/1, baud tiers, trunk numbering) were established for the dedicated serial BLN. **The message layer above the framing is now recovered from controller firmware — see §6.8** — giving the address byte and its position, a compact operation encoding, a 253-byte cap, and the forwarding rule for a message addressed elsewhere. **The message layer is now attested from the supervisor end as well** — the reference implementation builds the same encoding on the supervisor side, agreeing with the panel on the group/ordinal pair and adding the ordinal's byte order (§6.8). [S] What is still unobserved is the **link** layer beneath it: start/sync delimiting, CRC/checksum, and the medium's segmentation, all of which a lower layer has already stripped before the code in §6.8 sees the message. The supervisor's link-layer component was examined for them and does not carry them: it is a transport — ports, partners, sequence numbers, a socket path and a modem path — and it hands the reference implementation's output down without prefixing a P2 header, so the three bytes preceding the group byte are added below it or supplied by the medium. [S] An AEM Channel-1 capture (TCP/3001) remains the way to see them, since the AEM tunnels the serial stream verbatim.
 
-> **[OPEN] FLN/P1 frame bytes.** The P1 fieldbus discovery transaction (P1WhoAreYou), addressing (drop + application number), physical layer (RS-485 2-wire), and baud are documented, but the P1 frame byte layout itself is unobserved. The on-wire P1 frame structure, the WhoAreYou request/response bytes, and the per-poll cadence/retry behavior require a P1-bus capture or a route-through capture from the BLN. **The route-through opcode is now named: `0x0313 AP2_P1_ROUTE`, with `0x0314` alongside it** (§9.1.1). Sixteen distinct field-device operations tunnel through `0x0313`, so a capture containing it carries P1 payloads inside a P2 frame — which is the cheapest route to these bytes, and needs no access to the RS-485 segment itself. Neither opcode occurs in any capture in the present corpus.
+> **[OPEN, PARTLY ANSWERED] FLN/P1 frame bytes.** The P1 fieldbus discovery transaction (P1WhoAreYou), addressing (drop + application number), physical layer (RS-485 2-wire), and baud are documented, but the P1 frame byte layout itself is unobserved. The on-wire P1 frame structure, the WhoAreYou request/response bytes, and the per-poll cadence/retry behavior require a P1-bus capture or a route-through capture from the BLN. **The route-through opcode is now named: `0x0313 AP2_P1_ROUTE`, with `0x0314` alongside it** (§9.1.1). Sixteen distinct field-device operations tunnel through `0x0313`, so a capture containing it carries P1 payloads inside a P2 frame — which is the cheapest route to these bytes, and needs no access to the RS-485 segment itself. Neither opcode occurs in any capture in the present corpus. **The WhoAreYou command code and reply body are now observed from a live panel through its own line test** (§5.5.1): command `0x80`, reply `06 <4-char revision> 00 <application u16 LE>`. [W] The P1 link framing around them (address byte, checksum, turnaround) and the poll cadence are still unobserved.
 
 > **[OPEN, LARGELY ANSWERED] P2 segmentation thresholds and reassembly rules.** The ~256-byte figure from vendor connection-test material is a *connection-test ping* size, **not** a maximum P2 data-packet cap — single P2 frames are observed with `total_len` up to ≈1,587 bytes (a ~1,530-byte body of packed records plus header+slots) in one response [W]. **The ceiling and the reassembly rule are now recovered from the reference implementation.** A segment buffer is **16,384 bytes**, of which the reference encoder is handed `buf+2` with a capacity of **16,382 bytes**; the two reserved bytes at `buf[0]` are the `u16` function code, which is why the wire carries the opcode immediately before the body and why `total_length` includes it. Reassembly is a cursor against a declared total: each mapped segment copies `n` bytes and advances the cursor, except the last, whose length is `total - cursor`; the sender therefore knows the total before it begins. The command object carries an explicit **more-follows** field, set on the segmenting path and cleared on the direct one. [S] **What is still open is the wire behaviour at the threshold.** No body in the corpus exceeds 16,382 B — the largest complete body is 1,570 B and the largest *declared* is 12,073 B — so the corpus is consistent with the ceiling without exercising it. Whether a result larger than one segment appears as two P2 frames, and what marks the continuation on the wire, needs a capture of an upload large enough to segment. [W][OPEN]
 
@@ -1778,9 +1778,74 @@ Below the BLN, a panel discovers and identifies the devices on each of its P1 FL
 
 Access from the BLN to an FLN device is **route-through**: a client connects to the hosting BLN panel (over P2/TCP) and then addresses the device behind it; the panel polls its FLN device over P1 and returns the data (see §3 / the addressing section). The FLN-scoped browse/enumerate operations on the BLN side are the `0x09xx` upload/enumerate family and the FLN-topology query `0x5301` `AP2_GET_FLN_TOPOLOGY` [S]; FLN scan enable/disable is `0x4630`/`0x4631` (`AP2_FLN_SCAN_ENABLE` / `_DISABLE`) [S]. The route-through model is why BLN-to-FLN access never appears as a separate transport — it is always layered on an established P2 node session.
 
+#### 5.5.1 P1WhoAreYou through the line test (`0x0314 AP2_P1_LINETEST`)
+
+`0x0314` is the one route-through request that addresses an FLN drop by **trunk
+and drop number** rather than by a defined device name, so it reaches a drop the
+panel's database does not know. `0x0313` addresses by name and resolves through the
+database, so it cannot. The supervisor uses `0x0314` for exactly this purpose: its
+system-profile discovery loops trunks 0–3 and drops 0–31, skips drops already
+defined, and sends the line test with P1 command `0x80` and no data to each
+remaining drop. [S]
+
+Request body, as the supervisor's encoder builds it:
+
+```
+03 14            opcode AP2_P1_LINETEST
+u8   fln         trunk number (0-3)
+u8   drop        drop number (0-31)
+u8   p1_cmd      P1 command code; 0x80 = Who Are You
+u16  len (BE)    length of data; 0 for Who Are You
+u8[len] data
+
+e.g. trunk 3, drop 2, Who Are You:   03 14 03 02 80 00 00
+```
+
+The encoder output and the field order are [S]; the request has **not** been seen
+in a P2 capture yet. [OPEN] The response is `<u16 len> <P1 reply bytes>`. [S]
+
+**The P1 side, observed live.** The panel's operator-terminal (MMI) line test,
+*System → Diagnostics → Fln → Linetest*, asks for trunk, drop, **Command** and
+**Data**, the same fields as the request above, and prints the P1 reply in hex.
+**Command** is the P1 command code, **entered in hex**. Entering `80` with empty
+data on a drop holding a working field device (firmware revision `DE10`, an
+application number of 710 in the panel database) gave:
+
+```
+ Command
+ 80                                               .
+ Response
+ 06 44 45 31 30 00 c6 02                          .DE10...
+```
+
+| bytes | meaning | tag |
+|---|---|---|
+| `06` | leading byte. Meaning not pinned. Seen from one device only. | [W] value, [OPEN] meaning |
+| `44 45 31 30` | the device's 4-character ASCII revision string, `DE10`, which matches the revision the panel's FLN display shows for that drop | [W] |
+| `00` | separator / pad | [W] value, [OPEN] meaning |
+| `c6 02` | application number, **little-endian** u16 = `0x02C6` = 710, which matches the application stored for that drop in the panel's device record (where it is big-endian, `02 C6`) | [W] |
+
+So the device answers Who Are You with its revision and its application number,
+which are the two things a panel checks against its definition (a mismatch is the
+`Failed P1WhoAreYou` error above). [W][I] Note the byte order: the P1 reply carries
+the application number low byte first, while the P2 device record carries it high
+byte first. [W]
+
+A drop with no device, or with a device that does not answer (unpowered, or on an
+open trunk), returns no P1 bytes: the operator terminal reports **Device failed**
+(`E3602`). [W] Sweeping every drop on a trunk this way is therefore a read-only
+presence census that works on drops the database does not define, which none of the
+FLN display, enable or scan operations can do.
+
+**Safety.** `0x80` changes nothing in the device. The same prompt accepts any P1
+command code, including ones that reset, write, release, characterize or rewrite
+device memory, and the wildcard drop addresses every device on the trunk. Only
+`0x80` is documented here; this document does not list the others' bytes. Probes
+were sent one drop at a time with the panel's normal polling running.
+
 ### 5.6 Open items — discovery & FLN timing
 
-> **[OPEN] FLN/P1 wire bytes.** P1WhoAreYou, FLN addressing (drop + application number), and the route-through model are documented at the behavioral level, but the P1 frame bytes — the WhoAreYou request/response layout and the per-device poll cadence — are unobserved. Needs a P1-bus or route-through capture.
+> **[OPEN, PARTLY ANSWERED] FLN/P1 wire bytes.** The WhoAreYou command code (`0x80`) and reply body (`06 <rev ×4> 00 <application u16 LE>`) are now observed from a live panel (§5.5.1). [W] Still open: a P2 capture of the `0x0314` request and its response framing, the P1 link framing on the RS-485 segment (address byte, checksum, turnaround), the meaning of the reply's `06` and `00` bytes, and the per-device poll cadence. Needs a route-through capture of the line test, or a P1-bus capture.
 
 > **[OPEN] Per-frame retry/ACK timing.** All established timing is at the discovery/replication layer (EPing periods/timeouts; replication notify/poll/cycle; the binary Extended-Timeout pre-Rev-2.1 compatibility flag). P2 *frame-level* retry counts and per-frame ACK/sequence timeouts are not established and should not be inferred from the discovery-layer periods.
 
@@ -3712,7 +3777,8 @@ unitary-controller upload/define set including its time-set and trace-clear.
 Sixteen operations, sixteen command classes, **one shared encoder**: the wire
 opcode does not name the operation because its job is to say *route this onto
 P1*. The operation is inside the payload. `0x0314 AP2_P1_LINETEST` pairs with it
-and is shared by two. `0x0136 AP2_P2_ROUTE` is the same idea for the panel-local
+and is shared by two; unlike `0x0313` it addresses by trunk and drop, and
+its Who Are You use is laid out in §5.5.1. `0x0136 AP2_P2_ROUTE` is the same idea for the panel-local
 serial link of §6.8. [S]
 
 **For a dissector:** labelling a frame from its AP2 opcode alone is right for
@@ -11912,6 +11978,11 @@ specific test that would confirm or falsify it.
    the serial-AEM encapsulation — this spec covers the BLN/P2-over-IP frame, not
    the fieldbus frame. *Test:* capture FLN-scoped browse/enumerate traffic and, if
    accessible, the serial side of an AEM, to pin the P1/FLN and AEM frame formats.
+   *Partly answered:* the P1 **Who Are You** command (`0x80`) and its reply body
+   (`06 <rev ×4> 00 <application u16 LE>`) are observed from a live panel through
+   the operator-terminal line test, and the `0x0314` request layout that carries
+   them is recovered from the supervisor's encoder (§5.5.1). Still missing: a P2
+   capture of `0x0314` itself, the P1 link framing, and the AEM encapsulation.
 
 5. **Sub-opcode byte structure.** *Known:* some opcodes carry a 2-byte sub-field
    immediately after the opcode (e.g. `00 01` / `00 00`) before the body, and the
