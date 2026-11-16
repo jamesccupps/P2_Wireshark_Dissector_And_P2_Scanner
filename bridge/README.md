@@ -339,6 +339,7 @@ The new PXC's points appear with fresh BACnet instance IDs. Existing supervisor 
 - Polling, not COV — predictable, bounded load.
 - No PPCL writes, no schedule edits, no alarm acknowledgements. Those opcodes exist and [`PROTOCOL.md`](../PROTOCOL.md) documents them — point command in §10.3, PPCL in §14, alarming in §13, time-of-day in §15 — but the bridge does not expose any of them.
 - The BACnet side advertises exactly the six services it answers: `readProperty`, `readPropertyMultiple`, `i-Am`, `i-Have`, `who-Is`, `who-Has`. `writeProperty` is not among them.
+- **No access control on the BACnet side.** BACnet/IP has no authentication: anything that can reach the bind address (`bacnet_address`, UDP/47808) can discover the bridge and read every point it bridges. Bind it to the interface on your building-automation network, not a tenant, guest or office one.
 
 ---
 
