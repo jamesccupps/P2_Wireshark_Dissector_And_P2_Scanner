@@ -1,5 +1,54 @@
 # Changelog
 
+## Unreleased
+
+A second outside review (2026-11-15) read part of the scanner. Its four defects
+and its repository notes were all real, and two of the defects were worse than
+it rated them.
+
+### The emit guard never refused anything
+
+`P2Connection._send_message` called `check_emit_allowed(getattr(msg, "opcode",
+None))`. `P2Message` has never had an `opcode` attribute, so from 2.7.0 through
+2.11.0 the guard was asked about `None` on every frame and permitted all of
+them. That left the one send path it sat on unguarded, and the bridge sends
+through the same connection class. Nothing the tools build is on the blocklist,
+so nothing harmful went out: the blocklist simply did nothing. The opcode is
+now read from the frame's own bytes (`P2Message.request_opcode()`), and a
+request whose opcode cannot be located is refused. **2.11.0's note that "the
+emit guard sees one of ten send paths" was wrong when written: it saw none.** It
+is true now.
+
+### The scanner touches only the addresses you named
+
+`parse_ip_range` honoured only `/24` and `/16`; any other prefix scanned the
+`/24` around its base, so a `/30` (two hosts) touched 254 and a `/8` touched one
+`/24`. CIDR now accepts any prefix from `/16` to `/32`. Wider than a `/16` is
+refused, not narrowed, and malformed entries are refused with the entry named.
+A `/16` now yields all 65,534 hosts (it used to skip `.0` and `.255` in each
+inner `/24`). Other formats are unchanged.
+
+### A slow or odd peer no longer stalls a scan
+
+- `P2Connection._recv_message` applied `READ_TIMEOUT` per `recv`, so a peer
+  sending one byte just inside it held a read open indefinitely (24 s against a
+  1 s timeout, measured). The timeout now bounds the whole frame, as 2.11.0 made
+  it for `_recv_one_frame`.
+- Device discovery converted an APPLICATION value with `int()`, which raises on a
+  NaN or an infinity, and nothing caught it: one such reply ended discovery for
+  every node still to come. The device is now recorded with application `0`.
+- Discovery collected a batch's replies until the peer paused, with no other
+  bound. Collection now stops at 256 KiB or 10 s.
+
+### Repository
+
+- CI actions are pinned by commit (they were pinned by moving tag), and
+  `.github/dependabot.yml` proposes updates monthly.
+- `bridge/README.md` says the BACnet side has no access control, and which
+  interface to bind.
+- **287 tests** (196 scanner, 22 virtual PXC, 69 bridge). Each code fix above
+  landed with a test that fails on the code before it.
+
 ## v2.11.0 — an outside audit, and a probe that framed itself wrong (2026-11-11)
 
 Nearly sixty commits since 2.10.1. Cold discovery was building most of its
