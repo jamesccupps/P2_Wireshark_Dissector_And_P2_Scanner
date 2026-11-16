@@ -73,6 +73,7 @@ import time
 import sys
 import os
 import argparse
+import ipaddress
 import json
 import csv
 import re
@@ -3557,6 +3558,12 @@ PANEL_POINT_NAMES = [
 ]
 
 
+#: The widest range one entry may name. A /16 is the widest this parser has
+#: ever accepted; anything wider is refused, where it used to be quietly
+#: narrowed to a /24.
+MAX_RANGE_ADDRESSES = 1 << 16
+
+
 def parse_ip_range(range_str: str) -> List[str]:
     """
     Parse flexible IP range formats into a list of IPs.
@@ -3564,49 +3571,58 @@ def parse_ip_range(range_str: str) -> List[str]:
     Supported formats:
         192.0.2.50              Single IP
         192.0.2.1-254            Last octet range
-        192.0.2.0/24             CIDR notation
+        192.0.2.0/24             CIDR notation, any prefix from /16 to /32
         192.0.2                 Shorthand for .1-.254
         192.0.2.0/24,198.51.100.0/24   Comma-separated multiple ranges
+
+    Returns exactly the addresses named. Raises ValueError, naming the entry,
+    for anything it cannot parse and for a range wider than a /16.
+
+    Through 2.11.0 only /24 and /16 were honoured: any other prefix scanned the
+    /24 around its base address, so a /30 (two hosts) touched 254 and a /8
+    touched one /24. Malformed entries with three dots were passed through
+    unchecked. A scanner on a building network should touch the addresses its
+    operator named and no others.
     """
     ips = []
     for part in range_str.split(','):
         part = part.strip()
-
-        if '/' in part:
-            # CIDR notation
-            base, prefix_len = part.split('/')
-            prefix_len = int(prefix_len)
-            octets = [int(o) for o in base.split('.')]
-            if prefix_len == 24:
-                for i in range(1, 255):
-                    ips.append(f"{octets[0]}.{octets[1]}.{octets[2]}.{i}")
-            elif prefix_len == 16:
-                for s3 in range(0, 256):
-                    for s4 in range(1, 255):
-                        ips.append(f"{octets[0]}.{octets[1]}.{s3}.{s4}")
-            else:
-                # Just do /24 from the base
-                for i in range(1, 255):
-                    ips.append(f"{octets[0]}.{octets[1]}.{octets[2]}.{i}")
-
-        elif '-' in part.split('.')[-1]:
-            # Range in last octet: 192.0.2.1-254
-            base = '.'.join(part.split('.')[:-1])
-            range_part = part.split('.')[-1]
-            start, end = range_part.split('-')
-            for i in range(int(start), int(end) + 1):
-                ips.append(f"{base}.{i}")
-
-        elif part.count('.') == 2:
-            # Shorthand subnet: 192.0.2 → 192.0.2.1-254
-            for i in range(1, 255):
-                ips.append(f"{part}.{i}")
-
-        elif part.count('.') == 3:
-            # Single IP
-            ips.append(part)
-
+        if not part:
+            continue
+        try:
+            ips.extend(_parse_range_part(part))
+        except ValueError as e:
+            raise ValueError(f"cannot scan {part!r}: {e}") from None
     return ips
+
+
+def _parse_range_part(part: str) -> List[str]:
+    if '/' in part:
+        net = ipaddress.IPv4Network(part, strict=False)
+        if net.num_addresses > MAX_RANGE_ADDRESSES:
+            raise ValueError(
+                f"a /{net.prefixlen} is {net.num_addresses:,} addresses; the "
+                "widest range accepted is a /16, so split it up")
+        # hosts() leaves out the network and broadcast addresses. A /31 or /32
+        # has neither, and older Pythons return nothing for a /32.
+        return [str(a) for a in (net if net.prefixlen >= 31 else net.hosts())]
+
+    base, _, last = part.rpartition('.')
+    if '-' in last:
+        start, _, end = last.partition('-')
+        if not (start.isdigit() and end.isdigit()):
+            raise ValueError("a last-octet range is written a.b.c.N-M")
+        lo, hi = int(start), int(end)
+        if not 0 <= lo <= hi <= 255:
+            raise ValueError("a last-octet range runs low to high within 0-255")
+        ipaddress.IPv4Address(f"{base}.{lo}")      # checks the first three octets
+        return [f"{base}.{i}" for i in range(lo, hi + 1)]
+
+    if part.count('.') == 2:
+        ipaddress.IPv4Address(f"{part}.1")
+        return [f"{part}.{i}" for i in range(1, 255)]
+
+    return [str(ipaddress.IPv4Address(part))]
 
 
 def port_scan_p2(ip_list: List[str], timeout: float = 0.5) -> List[str]:
@@ -4686,7 +4702,11 @@ def discover_network(ip_ranges: str = "192.0.2", scan_ports: bool = True,
 
     # Step 1: Find P2 hosts
     if scan_ports:
-        ip_list = parse_ip_range(ip_ranges)
+        try:
+            ip_list = parse_ip_range(ip_ranges)
+        except ValueError as e:
+            print(f"\n  [ERROR] {e}")
+            return
         print(f"\n  [1/3] Port scanning {len(ip_list)} IPs for TCP/{P2_PORT}...")
         print(f"        Range: {ip_ranges}")
         hosts = port_scan_p2(ip_list)
