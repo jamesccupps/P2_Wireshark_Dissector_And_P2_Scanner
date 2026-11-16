@@ -1803,8 +1803,13 @@ e.g. trunk 3, drop 2, Who Are You:   03 14 03 02 80 00 00
 
 The encoder output and the field order are [S]; the request has **not** been seen
 in a P2 capture yet. [OPEN] The response is `<u16 len> <P1 reply bytes>`. [S]
+The type system names the request fields `lan`, `drop`, `p1_command`,
+`nrOftx_buffer` and `tx_buffer` (`AP2_P1_Linetest_Request`), and the response
+fields `nrOfrx_bytes` and `rx_bytes`, in the order above. [S]
 
-**The P1 side, observed live.** The panel's operator-terminal (MMI) line test,
+**The P1 side, observed live.** This observation was contributed by AutomataNexus
+from a panel of their own; it is not in this project's capture corpus. The panel's
+operator-terminal (MMI) line test,
 *System → Diagnostics → Fln → Linetest*, asks for trunk, drop, **Command** and
 **Data**, the same fields as the request above, and prints the P1 reply in hex.
 **Command** is the P1 command code, **entered in hex**. Entering `80` with empty

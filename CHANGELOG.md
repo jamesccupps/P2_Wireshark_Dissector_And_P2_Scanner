@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **`PROTOCOL.md` §5.5.1: P1 Who Are You through the `0x0314` line test**, contributed
+  by AutomataNexus ([#1](https://github.com/jamesccupps/P2_Wireshark_Dissector_And_P2_Scanner/pull/1)).
+  The first P1 bytes in the document: the Who Are You command (`0x80`) and its reply
+  body, observed on their own panel through the operator-terminal line test, and
+  the `0x0314` request that carries it. The request layout and the supervisor's
+  discovery loop were checked against this project's own copies of the supervisor
+  before merging, and agree.
+
 ## v2.11.1 — the guard that never refused (2026-11-16)
 
 A second outside review (2026-11-15) read part of the scanner. Its four defects
