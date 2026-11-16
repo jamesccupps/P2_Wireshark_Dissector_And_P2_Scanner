@@ -30,19 +30,19 @@ def _frame(seq: int, value: bytes) -> bytes:
 
 
 class _Peer:
-    """Accept one connection, read the batch, then run `behaviour(conn, stop)`."""
+    """Accept one connection, read the batch, then run `behavior(conn, stop)`."""
 
-    def __init__(self, behaviour):
+    def __init__(self, behavior):
         self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.srv.bind(("127.0.0.1", 0))
         self.srv.listen(1)
         self.port = self.srv.getsockname()[1]
         self.stop = threading.Event()
-        self.thread = threading.Thread(target=self._run, args=(behaviour,),
+        self.thread = threading.Thread(target=self._run, args=(behavior,),
                                        daemon=True)
         self.thread.start()
 
-    def _run(self, behaviour):
+    def _run(self, behavior):
         conn, _ = self.srv.accept()
         try:
             conn.settimeout(5)
@@ -52,7 +52,7 @@ class _Peer:
                 if not chunk:
                     return
                 got += chunk
-            behaviour(conn, self.stop)
+            behavior(conn, self.stop)
         except OSError:
             pass
         finally:
@@ -68,8 +68,8 @@ class _Peer:
 def run(monkeypatch):
     peers = []
 
-    def _run(behaviour):
-        peer = _Peer(behaviour)
+    def _run(behavior):
+        peer = _Peer(behavior)
         peers.append(peer)
         monkeypatch.setattr(ps, "P2_PORT", peer.port)
         monkeypatch.setattr(ps, "P2_NETWORK", "MYBLN")

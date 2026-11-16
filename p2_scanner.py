@@ -122,7 +122,7 @@ except ImportError:
 # Single source of truth for the scanner library version. Keep in sync
 # with pyproject.toml's [project].version. `import p2_scanner` users can
 # inspect `p2_scanner.__version__` rather than parsing pyproject metadata.
-__version__ = "1.5.0"
+__version__ = "1.5.1"
 
 # Console output uses Unicode formatting chars (✓ ✗ ⚠ ── → ═) for readability.
 # Windows defaults to cp1252 in cmd.exe / PowerShell, which crashes on these.
@@ -1011,7 +1011,7 @@ class P2Message:
     OP_EBLN_TELNET_DISABLE       = 0x4645   # AP2 enum; NOT 0x4642
     #
     # Naming note: OP_ROUTING_TABLE (0x4634) above was named from observed
-    # behaviour ("BLN routing-table announce/push"). The AP2 name for the same
+    # behavior ("BLN routing-table announce/push"). The AP2 name for the same
     # opcode is Repl Pull, which fits the traffic -- 1,267 requests, 59% of them
     # panel-initiated, pulling replication changes. Both constants are kept; the
     # older one is not renamed because callers depend on it.
@@ -3604,7 +3604,7 @@ def parse_ip_range(range_str: str) -> List[str]:
     Returns exactly the addresses named. Raises ValueError, naming the entry,
     for anything it cannot parse and for a range wider than a /16.
 
-    Through 2.11.0 only /24 and /16 were honoured: any other prefix scanned the
+    Through 2.11.0 only /24 and /16 were honored: any other prefix scanned the
     /24 around its base address, so a /30 (two hosts) touched 254 and a /8
     touched one /24. Malformed entries with three dots were passed through
     unchecked. A scanner on a building network should touch the addresses its

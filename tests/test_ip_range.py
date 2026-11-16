@@ -1,6 +1,6 @@
 """`parse_ip_range` returns exactly the addresses its operator named.
 
-Through 2.11.0 it honoured only /24 and /16. Any other prefix scanned the /24
+Through 2.11.0 it honored only /24 and /16. Any other prefix scanned the /24
 around its base address -- a /30 asking for two hosts touched 254, a /8 touched
 one /24 -- and an entry like 192.0.2.300 was passed straight to the port scan.
 Found by an outside review, 2026-11-15.

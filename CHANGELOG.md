@@ -1,10 +1,14 @@
 # Changelog
 
-## Unreleased
+## v2.11.1 — the guard that never refused (2026-11-16)
 
 A second outside review (2026-11-15) read part of the scanner. Its four defects
 and its repository notes were all real, and two of the defects were worse than
 it rated them.
+
+**Versions:** toolkit 2.11.1 · `p2_scanner` 1.5.1. `p2.lua` (2.11.0) and the bridge
+(0.5.0) are unchanged; the bridge picks up the scanner's fixes, because it sends
+and reads through `P2Connection`.
 
 ### The emit guard never refused anything
 
@@ -21,7 +25,7 @@ is true now.
 
 ### The scanner touches only the addresses you named
 
-`parse_ip_range` honoured only `/24` and `/16`; any other prefix scanned the
+`parse_ip_range` honored only `/24` and `/16`; any other prefix scanned the
 `/24` around its base, so a `/30` (two hosts) touched 254 and a `/8` touched one
 `/24`. CIDR now accepts any prefix from `/16` to `/32`. Wider than a `/16` is
 refused, not narrowed, and malformed entries are refused with the entry named.
@@ -591,7 +595,7 @@ value.
 `[4B length BE] [4B msg_type=0x33/0x34] ...`, which reads as a fixed pair of
 class bytes. `msg_type` is a header length, `13 + the total bytes of the four
 routing slots`; `0x33` and `0x34` are simply the two lengths that capture's node
-names produced. No behaviour change — the code has computed the field since
+names produced. No behavior change — the code has computed the field since
 1.4.0.
 
 ## v2.9.0 — the correctness pass (2026-09-18)
@@ -801,7 +805,7 @@ The current release is summarised at the top of [README.md](README.md).
   the name belonging to the next code up. The `_v2` suffixes the old table used
   (`already_exists_v2`, `value_out_of_range_v2`) are the tell: the duplicate
   names the shift produced were suffixed rather than investigated.
-- **One consequence was behavioural, not cosmetic.** `0x0E11` was named
+- **One consequence was behavioral, not cosmetic.** `0x0E11` was named
   `already_exists` and `p2_scanner` treated it as a **success**, so a failed FLN
   point-add was reported as having worked. `0x0E11` is *FLN invalid drop number*;
   the code that means already-exists is `0x0009`, which had been left unnamed.
