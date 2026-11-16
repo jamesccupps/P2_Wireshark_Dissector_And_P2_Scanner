@@ -4478,6 +4478,15 @@ def verify_devices(host: str, node_name: str, devices: List[Dict],
     return devices
 
 
+#: Bounds on collecting one discovery batch's replies. A batch is 25 reads and
+#: a panel answers it in a few kilobytes within a second or two. The loop used
+#: to stop only when the peer paused for 0.3 s, so a peer that never paused
+#: could grow the buffer without limit, or hold the scan for as long as it kept
+#: a byte arriving inside each 0.3 s.
+DISCOVERY_BATCH_REPLY_CAP = 256 * 1024
+DISCOVERY_BATCH_REPLY_SECONDS = 10.0
+
+
 def discover_devices_on_node(host: str, node_name: str,
                              device_list: Optional[List[str]] = None,
                              use_enumerate: bool = True) -> List[Dict]:
@@ -4572,8 +4581,10 @@ def discover_devices_on_node(host: str, node_name: str,
             # Collect responses for this batch
             all_data = b""
             s.settimeout(2)
+            give_up = time.monotonic() + DISCOVERY_BATCH_REPLY_SECONDS
             try:
-                while True:
+                while (len(all_data) < DISCOVERY_BATCH_REPLY_CAP
+                       and time.monotonic() < give_up):
                     chunk = s.recv(16384)
                     if not chunk:
                         break
@@ -4615,7 +4626,13 @@ def discover_devices_on_node(host: str, node_name: str,
                     after_flags = msg_data[flags_idx + 3:]
                     if len(after_flags) >= 8:
                         raw_val = after_flags[4:8]
-                        app_num = int(struct.unpack('>f', raw_val)[0])
+                        # int() raises on a NaN or an infinity, and nothing
+                        # here or in the per-node loop above catches it: one
+                        # such reply used to end discovery for every node still
+                        # to come. A device that answered is still recorded;
+                        # its application number is unknown, as for a non-TEC.
+                        f = struct.unpack('>f', raw_val)[0]
+                        app_num = int(f) if f == f and -1e9 < f < 1e9 else 0
                         desc = ''
                         lp_strings = P2Connection._extract_lp_strings(msg_data[12:flags_idx])
                         routing_set = {P2_NETWORK, SCANNER_NAME, P2_SITE,
