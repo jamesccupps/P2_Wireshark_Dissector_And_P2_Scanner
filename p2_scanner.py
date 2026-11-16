@@ -1074,26 +1074,33 @@ class P2Message:
         self.is_dbchange_notify = self._is_dbchange_notify(payload)
 
     @classmethod
-    def _is_dbchange_notify(cls, payload: bytes) -> bool:
-        """True for a request carrying one of the DBCHANGE_NOTIFY_OPCODES.
+    def request_opcode(cls, payload: bytes) -> Optional[int]:
+        """The opcode a request carries, or None if it carries none.
 
         The opcode is not at a fixed offset -- it follows four NUL-terminated
         routing slots whose lengths are the peers' names -- so it is reached
         with the same slot walk `msg_type_for` already does rather than by a
-        second hand-rolled one. A payload that does not frame at all is not a
-        notification; it is a runt, and the caller's generic path should see
-        it.
+        second hand-rolled one. Responses carry no opcode, and a payload that
+        does not frame has none to find.
         """
         if not payload or payload[0] != 0x00:      # responses carry no opcode
-            return False
+            return None
         try:
             off = cls.msg_type_for(payload) - 12
         except ValueError:
-            return False
+            return None
         if off + 2 > len(payload):
-            return False
-        opcode = struct.unpack_from('>H', payload, off)[0]
-        return opcode in cls.DBCHANGE_NOTIFY_OPCODES
+            return None
+        return struct.unpack_from('>H', payload, off)[0]
+
+    @classmethod
+    def _is_dbchange_notify(cls, payload: bytes) -> bool:
+        """True for a request carrying one of the DBCHANGE_NOTIFY_OPCODES.
+
+        A payload that does not frame at all is not a notification; it is a
+        runt, and the caller's generic path should see it.
+        """
+        return cls.request_opcode(payload) in cls.DBCHANGE_NOTIFY_OPCODES
 
     @staticmethod
     def msg_type_for(payload: bytes) -> int:
@@ -1246,7 +1253,9 @@ EBLN_DIAGNOSTIC_RANGE = range(0x4646, 0x4651)
 def check_emit_allowed(opcode: int) -> None:
     """Raise if an opcode must never be emitted by this tool.
 
-    Called from P2Connection._send_message on every outbound frame.
+    Called from P2Connection._send_message on every outbound frame, with the
+    opcode read from the frame's own bytes (until 2.11.0 it was handed None
+    and permitted everything -- see _send_message).
     Deliberately not overridable by a flag: a determined caller can edit the
     source, but nobody does that by accident.
 
@@ -1439,10 +1448,22 @@ class P2Connection:
         lived here unenforced for one release -- defined, documented in the
         commit message, and called from nowhere. A safety guard that is not
         on the path is not a safety guard.
+
+        Then, from 2.7.0 through 2.11.0, it was on the path and still checked
+        nothing: it was handed `getattr(msg, "opcode", None)`, an attribute
+        P2Message has never had, so it was asked about None on every frame
+        and permitted all of them. The opcode is now read out of the payload
+        that is about to go on the wire, and a request whose opcode cannot be
+        located is refused rather than waved through.
         """
         if not self.sock:
             return False
-        check_emit_allowed(getattr(msg, "opcode", None))
+        opcode = P2Message.request_opcode(msg.payload)
+        if opcode is None:
+            raise PermissionError(
+                "refusing to send a frame with no locatable opcode: the emit "
+                "guard cannot check what it cannot read")
+        check_emit_allowed(opcode)
         try:
             self.sock.sendall(msg.to_bytes())
             return True

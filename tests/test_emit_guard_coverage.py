@@ -1,5 +1,8 @@
 """`check_emit_allowed` sees 1 of the 10 send paths, and says so.
 
+(Until 2.11.0 it saw none: the one guarded path handed it None. That path is
+tested in test_send_guard.py; this file covers the nine it does not see.)
+
     "Coverage, stated honestly: a few standalone helpers (handshake, cold
      discovery) build raw frames and call sock.sendall directly, bypassing
      this check. Audited at the time of writing -- the only EBLN opcodes any
