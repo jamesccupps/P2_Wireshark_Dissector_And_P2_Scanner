@@ -1,0 +1,8 @@
+# Proposes updates to the commit-pinned actions in workflows/tests.yml, as a
+# pull request naming the new release. Nothing merges on its own.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
