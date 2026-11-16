@@ -1473,14 +1473,34 @@ class P2Connection:
             return False
 
     def _recv_message(self) -> Optional[P2Message]:
-        """Receive a single P2 message from the connection."""
+        """Receive a single P2 message from the connection.
+
+        The socket's timeout (READ_TIMEOUT) bounds the whole frame, not each
+        recv. Through 2.11.0 it bounded each recv, so a peer sending one byte
+        just inside the interval held the read open for as long as it kept
+        that up: 24 s with a 1 s timeout when measured, and hours for a large
+        frame. `_recv_one_frame` got a deadline in 2.11.0 for the same reason;
+        this path was missed. Bytes of a frame cut off by the deadline stay
+        buffered, as they always did on a timeout.
+        """
         if not self.sock:
             return None
+
+        budget = self.sock.gettimeout()
+        deadline = None if budget is None else time.monotonic() + budget
+
+        def recv() -> bytes:
+            if deadline is not None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise socket.timeout("frame deadline reached")
+                self.sock.settimeout(remaining)
+            return self.sock.recv(4096)
 
         try:
             # Read until we have at least 12 bytes for the header
             while len(self._recv_buffer) < 12:
-                chunk = self.sock.recv(4096)
+                chunk = recv()
                 if not chunk:
                     return None
                 self._recv_buffer += chunk
@@ -1498,7 +1518,7 @@ class P2Connection:
 
             # Read until we have the full message
             while len(self._recv_buffer) < total_len:
-                chunk = self.sock.recv(4096)
+                chunk = recv()
                 if not chunk:
                     return None
                 self._recv_buffer += chunk
@@ -1513,6 +1533,12 @@ class P2Connection:
         except socket.error as e:
             print(f"  [ERROR] Receive failed: {e}")
             return None
+        finally:
+            if deadline is not None and self.sock is not None:
+                try:
+                    self.sock.settimeout(budget)
+                except OSError:
+                    pass
 
     def _recv_response(self, expected_seq: int, max_attempts: int = 10) -> Optional[P2Message]:
         """Receive a response paired to the expected request sequence.
