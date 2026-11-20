@@ -32,6 +32,26 @@ from .object_factory import build_object
 log = logging.getLogger(__name__)
 
 
+class ReadOnlyApplication(Application):
+    """An Application that refuses writes.
+
+    bacpypes3's Application answers WriteProperty and WritePropertyMultiple
+    for every property of every local object, whatever the device lists in
+    protocolServicesSupported. Through bridge 0.5.0 that went unnoticed: any
+    BACnet client on the network could overwrite a bridged presentValue (until
+    the next poll), set outOfService, or rename a point or the device itself
+    (until a restart). Nothing reached a panel -- the P2 side only reads -- but
+    a supervisor read whatever had been written.
+
+    With no handler, bacpypes3 rejects the request as `unrecognizedService`,
+    the correct answer for a service the device does not advertise. Reads,
+    including ReadRange and SubscribeCOV, are untouched.
+    """
+
+    do_WritePropertyRequest = None
+    do_WritePropertyMultipleRequest = None
+
+
 def build_application(
     cfg: BridgeConfig,
     manifest: Manifest,
@@ -88,7 +108,7 @@ def build_application(
              cfg.bacnet_device_instance, cfg.bacnet_device_name,
              len(active_entries))
 
-    app = Application.from_object_list(bacnet_objects)
+    app = ReadOnlyApplication.from_object_list(bacnet_objects)
     return app, objects_by_id, active_entries
 
 

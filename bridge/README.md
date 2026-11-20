@@ -29,7 +29,7 @@ Built on the P2 Scanner library in the root of this repository, which does the a
 
 ## What it deliberately doesn't do (yet)
 
-- **No writes.** Mirrors the P2 Scanner's safety stance — the scanner ships read-only, and so does this. RW points appear as AV/BV objects so supervisors get the right type, but writes are rejected. Adding writes is a single method change in `object_factory.py` once you decide to enable it.
+- **No writes.** Mirrors the P2 Scanner's safety stance — the scanner ships read-only, and so does this. RW points appear as AV/BV objects so supervisors get the right type, but writes are rejected: `WriteProperty` and `WritePropertyMultiple` are refused as unsupported services (`ReadOnlyApplication` in `p2_bridge/bacnet_app.py`). Through 0.5.0 they were not — see the changelog.
 - **No COV / push notifications.** v0.1 polls. The 5034-side push channel (`listen_for_push_notifications` in p2_scanner) is the natural follow-up — the cache layer is designed to accept either source.
 - **No alarms / events.** No `intrinsicReporting`, no `EventEnrollment` objects. Status flags propagate, but there are no BACnet alarm subscriptions yet.
 - **One BACnet device, all PXCs flat.** Simpler navigation. The manifest schema already carries node info, so splitting one BACnet device per PXC is a config switch later.
@@ -338,7 +338,7 @@ The new PXC's points appear with fresh BACnet instance IDs. Existing supervisor 
 - One TCP session per PXC — won't exhaust peer sessions.
 - Polling, not COV — predictable, bounded load.
 - No PPCL writes, no schedule edits, no alarm acknowledgements. Those opcodes exist and [`PROTOCOL.md`](../PROTOCOL.md) documents them — point command in §10.3, PPCL in §14, alarming in §13, time-of-day in §15 — but the bridge does not expose any of them.
-- The BACnet side advertises exactly the six services it answers: `readProperty`, `readPropertyMultiple`, `i-Am`, `i-Have`, `who-Is`, `who-Has`. `writeProperty` is not among them.
+- The BACnet side advertises six services: `readProperty`, `readPropertyMultiple`, `i-Am`, `i-Have`, `who-Is`, `who-Has`. It rejects `writeProperty` and `writePropertyMultiple` as unrecognized services. bacpypes3 also answers `readRange` and `subscribeCOV`, both reads, which the device does not advertise.
 - **No access control on the BACnet side.** BACnet/IP has no authentication: anything that can reach the bind address (`bacnet_address`, UDP/47808) can discover the bridge and read every point it bridges. Bind it to the interface on your building-automation network, not a tenant, guest or office one.
 
 ---

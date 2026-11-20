@@ -2,7 +2,7 @@
 
 ## Scope
 
-P2_BACnet_Bridge exposes Siemens APOGEE P2 field controllers as BACnet/IP objects, read-only. It does not implement BACnet `WriteProperty` handlers and does not issue P2 write opcodes. The threat model:
+P2_BACnet_Bridge exposes Siemens APOGEE P2 field controllers as BACnet/IP objects, read-only. It rejects BACnet `WriteProperty` and `WritePropertyMultiple` as unsupported services, and it does not issue P2 write opcodes. (bacpypes3 answers both writes by default, and through bridge 0.5.0 the bridge let it: a BACnet client could change the bridged values a supervisor reads, though nothing reached a panel.) The threat model:
 
 - An operator running the bridge to read APOGEE PXCs from a BACnet supervisor (Desigo CC, Niagara, EBI, etc.) on their own building network.
 - A site integrator using it during a Siemens-to-BACnet migration.
