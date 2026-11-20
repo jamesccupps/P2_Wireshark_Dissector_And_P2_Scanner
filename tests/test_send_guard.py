@@ -13,7 +13,9 @@ socket: no panel, no network.
 """
 from __future__ import annotations
 
+import re
 import struct
+from pathlib import Path
 
 import pytest
 
@@ -21,7 +23,7 @@ import p2_scanner as ps
 
 SLOTS = b"\x00MYBLN\x00NODE1\x00MYBLN\x00P2SCAN\x00"
 
-REFUSED = sorted(set(ps.EBLN_STALL_RISK) | set(ps.EBLN_WRITES)
+REFUSED = sorted(set(ps.REFUSED_OPCODES)
                  | {op for op in ps.EBLN_DIAGNOSTIC_RANGE
                     if op not in ps.EBLN_READS})
 
@@ -52,6 +54,35 @@ def _request(opcode: int) -> ps.P2Message:
 
 def test_the_refused_set_is_not_empty():
     assert len(REFUSED) >= 5
+
+
+def _catalog_destructive():
+    """Every opcode PROTOCOL.md's catalog flags DESTRUCTIVE, read from the
+    document rather than from the code, so the two can disagree."""
+    text = (Path(__file__).resolve().parent.parent / "PROTOCOL.md").read_text(
+        encoding="utf-8")
+    ops = {int(op, 16) for op in re.findall(
+        r"^\| (0x[0-9A-Fa-f]{4}) \| \w+ \|[^\n]*\*\*DESTRUCTIVE\*\*", text, re.M)}
+    assert len(ops) >= 20, "found %d DESTRUCTIVE rows; did the catalog move?" % len(ops)
+    return sorted(ops)
+
+
+@pytest.mark.parametrize("opcode", _catalog_destructive(), ids=hex)
+def test_every_opcode_the_catalog_flags_destructive_is_refused(opcode):
+    """PROTOCOL.md 9.3: a read-only tool refuses these in code. Through 2.11.1
+    the guard covered the EBLN block only; 18 of these went unrefused."""
+    conn = _connection()
+    with pytest.raises(PermissionError):
+        conn._send_message(_request(opcode))
+    assert conn.sock.sent == []
+
+
+@pytest.mark.parametrize("opcode", [0x4222, 0x0313, 0x0314], ids=hex)
+def test_the_tec_write_and_the_p1_tunnels_are_refused(opcode):
+    conn = _connection()
+    with pytest.raises(PermissionError):
+        conn._send_message(_request(opcode))
+    assert conn.sock.sent == []
 
 
 @pytest.mark.parametrize("opcode", REFUSED, ids=hex)

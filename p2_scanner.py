@@ -1222,7 +1222,44 @@ EBLN_WRITES = frozenset({
 # panel. 0x4647 shows the same signature.
 EBLN_STALL_RISK = frozenset({0x4636, 0x4647})
 
-REFUSED_OPCODES = EBLN_WRITES | EBLN_STALL_RISK
+# Everything PROTOCOL.md 9.3 flags DESTRUCTIVE in its opcode catalog outside the
+# EBLN block, which 9.3 says a read-only tool must refuse in code, even behind a
+# flag. Through 2.11.1 the guard refused only the EBLN block and none of these.
+# tests/test_send_guard.py reads the catalog and fails if it flags an opcode
+# this tool would send.
+DESTRUCTIVE_OPCODES = frozenset({
+    0x0034,  # AP2_SET_NODE_STATE
+    0x0035,  # AP2_SET_COMPLETE_NODE_STATE
+    0x0041,  # AP2_CABINET_ADD
+    0x0042,  # AP2_CABINET_REMOVE
+    0x0046,  # AP2_CABINET_ONLINE
+    0x0047,  # AP2_CABINET_OFFLINE
+    0x0108,  # AP2_CABINET_BOOT_MONITOR
+    0x010A,  # AP2_CABINET_COLDSTART
+    0x010B,  # AP2_CABINET_WARMSTART
+    0x0111,  # AP2_LICENSE_MANAGER_DELETE
+    0x0112,  # AP2_LICENSE_MANAGER_DELETE_ALL
+    0x012F,  # AP2_CABINET_MEMORY_MODIFY
+    0x0240,  # AP2_POINT_CMD_VALUE
+    0x0241,  # AP2_POINT_CMD_PRIORITY
+    0x4A03,  # AP2_COLBAS_WRITE
+    0x4A04,  # AP2_COLBAS_ABORT
+    0x5331,  # AP2_RESTORE_FLASH_DBASE
+    0x5332,  # AP2_CLEAR_FLASH_DBASE
+})
+
+# A write the catalog does not flag: AP2_TEC_SET_INIT_VALUE, the opcode the
+# supervisor falls back to when a setpoint write through 0x0240 is refused.
+POINT_WRITES = frozenset({0x4222})
+
+# The P1 tunnels carry any field-bus command to a field device: 0x0313 by
+# device name, 0x0314 by trunk and drop (PROTOCOL.md 5.5.1). That command set
+# includes reset, write, release and memory rewrite, and a wildcard drop reaches
+# every device on a trunk. This tool sends neither.
+P1_TUNNEL_OPCODES = frozenset({0x0313, 0x0314})
+
+REFUSED_OPCODES = (EBLN_WRITES | EBLN_STALL_RISK | DESTRUCTIVE_OPCODES
+                   | POINT_WRITES | P1_TUNNEL_OPCODES)
 
 
 def op_label(opcode):
@@ -1282,6 +1319,19 @@ def check_emit_allowed(opcode: int) -> None:
             f"{op_label(opcode)} is an EBLN write/configuration operation and is "
             "never emitted by this tool. Use the panel console if you intend "
             "to change configuration.")
+    if opcode in DESTRUCTIVE_OPCODES:
+        raise PermissionError(
+            f"{op_label(opcode)} changes panel or device state; PROTOCOL.md 9.3 "
+            "flags it DESTRUCTIVE, and this tool never emits it.")
+    if opcode in POINT_WRITES:
+        raise PermissionError(
+            f"{op_label(opcode)} writes a point value and is never emitted by "
+            "this tool.")
+    if opcode in P1_TUNNEL_OPCODES:
+        raise PermissionError(
+            f"{op_label(opcode)} tunnels an arbitrary P1 command to a field "
+            "device, including reset and write commands, and is never emitted "
+            "by this tool.")
     if opcode in EBLN_DIAGNOSTIC_RANGE and opcode not in EBLN_READS:
         raise PermissionError(
             f"{op_label(opcode)} is in the EBLN replication diagnostic block and "

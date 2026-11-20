@@ -18,7 +18,7 @@ You should hear back within a week. Fixes are credited in the changelog unless y
 
 ## What counts
 
-- **The scanner doing something destructive.** It is read-oriented by design and doesn't implement cold or warm start, flash erase or node eviction (see [Scope & ethics](README.md#scope--ethics)). A path that sends one of those, writes a point, or talks to a host or BLN you didn't give it is in scope.
+- **The scanner doing something destructive.** It is read-oriented by design and doesn't implement cold or warm start, flash erase or node eviction (see [Scope & ethics](README.md#scope--ethics)); its send path also refuses, in code, every opcode `PROTOCOL.md` flags DESTRUCTIVE, point writes, and the P1 tunnels. A path that sends one of those, writes a point, or talks to a host or BLN you didn't give it is in scope.
 - **Hostile input.** Panels, pushes and captures are untrusted. A frame or capture that crashes or hangs Wireshark through `p2.lua`, or that crashes, hangs or runs code in the scanner, its push listener or `analyze_pcap.py`, is in scope.
 - **The virtual panel** answering another computer when it was started with its default bind address (127.0.0.1).
 - **Real site data in the repository.** The sample capture is synthetic, and `reference_shapes.json` has lengths and contents stripped. If you find a real site's BLN, node names or addresses anywhere in the tree, please report it privately rather than in an issue.
