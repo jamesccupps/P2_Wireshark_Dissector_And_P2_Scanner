@@ -136,7 +136,7 @@ def parse_build_tag(model_string: Optional[str]) -> Optional[str]:
 # during the copy. On a GIL build it cannot: the copy is one C-level operation
 # that never yields, so no other thread runs inside it. Tested rather than
 # assumed -- six writer threads against a 400,000-entry cache, 41 full copies,
-# no error; and ~15,000 copies of a small one, likewise. CI runs 3.10-3.13,
+# no error; and ~15,000 copies of a small one, likewise. CI runs 3.10-3.14,
 # all standard builds.
 #
 # What would change the answer is a free-threaded build (3.13t and later),

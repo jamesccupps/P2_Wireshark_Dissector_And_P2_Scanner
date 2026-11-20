@@ -50,7 +50,7 @@ protocol's AP2 function-code vocabulary.
 > bridge; `bacpypes3` lives in `bridge/requirements.txt` and never at the
 > repository root, so cloning this repo for the scanner alone still installs
 > nothing. First CI too, now **287 tests** across three jobs on Python
-> 3.10–3.13 — every public tool here is under test, the GUI thinly.
+> 3.10–3.14 — every public tool here is under test, the GUI thinly.
 >
 > **Also in 2.10.0 — `PROTOCOL.md` §14 was wrong about 9.3% of PPCL.** It said
 > twenty-nine statements account for all 4,731 statement lines. They account for
