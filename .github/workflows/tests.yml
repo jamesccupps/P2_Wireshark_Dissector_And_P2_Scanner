@@ -6,6 +6,11 @@ name: tests
 # dependency-free job ever starts needing a requirements file, something has
 # been wired the wrong way round.
 #
+# The dissector job is the fourth: it installs tshark and runs p2.lua over the
+# sample capture and over seeded hostile frames. It is separate so the scanner
+# job stays dependency-free, and it sets P2_REQUIRE_TSHARK so a missing tshark
+# fails there instead of skipping.
+#
 # Actions are pinned by commit, not tag: a tag can be moved, and a moved tag
 # would change what runs here without a commit in this repository.
 # .github/dependabot.yml proposes updates.
@@ -53,6 +58,26 @@ jobs:
         run: python -m pip install --upgrade pip pytest
       - name: Tests
         run: python -m pytest tests/ -q
+
+  dissector:
+    name: p2.lua under tshark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Install tshark
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tshark
+          tshark --version | head -1
+      - name: Install pytest only
+        run: python -m pip install --upgrade pip pytest
+      - name: Dissector tests
+        env:
+          P2_REQUIRE_TSHARK: "1"
+        run: python -m pytest tests/test_dissector_tshark.py -v
 
   bridge:
     name: bridge
