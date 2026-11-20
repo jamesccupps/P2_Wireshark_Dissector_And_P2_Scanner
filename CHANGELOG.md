@@ -40,6 +40,11 @@ Protocols.**
 
 ### Also
 
+- **Ubuntu 26.04's packaged `tshark` refuses to open the personal plugin folder.** Its
+  AppArmor profile denied reading `~/.local/lib/wireshark/plugins/` and a `p2.lua` in
+  the home directory, and allowed one under `/tmp` (found when the new CI job first
+  ran). The README says how to load the plugin anyway. `p2.lua` itself loads and
+  dissects on that Wireshark (4.6.4, Lua 5.4).
 - `0x0240` and `0x0241` are named after the catalog's point commands (above). "Property
   echo" had no support anywhere.
 - CI runs Python 3.14 as well (3.10–3.14).
