@@ -951,7 +951,7 @@ class P2Message:
     OP_READ_SHORT      = 0x0220  # point read (short form)
     OP_COV_DISABLE     = 0x0273  # AP2_COV_DISABLE: disarms it. Never emitted by this tool
     OP_VALUE_PUSH      = 0x0274  # bidirectional: DCC->PXC virtual-write, or PXC->DCC COV
-    OP_WRITE_QUALITY   = 0x0240  # WriteWithQuality. 5034 PXC->DCC NONE/sep=0x00 (ACK'd) vs 5033 DCC->PXC SYST/sep=0x23 (errors 0x0E15 — Desigo retries with 0x4222)
+    OP_POINT_CMD_VALUE = 0x0240  # AP2_POINT_CMD_VALUE: commands a point's value — a write, refused by check_emit_allowed. Seen 5034 PXC->DCC NONE/sep=0x00 (ACK'd) vs 5033 DCC->PXC SYST/sep=0x23 (errors 0x0E15 — Desigo retries with 0x4222); parse_write_with_quality decodes it
     OP_ENUM_FLN        = 0x0986  # enumerate FLN devices
     OP_ENUM_POINTS     = 0x0981  # enumerate all points (cursor-based)
     OP_ENUM_PROGRAMS   = 0x0985  # enumerate PPCL programs — response carries source text
@@ -960,7 +960,7 @@ class P2Message:
     OP_ROUTING_TABLE   = 0x4634  # BLN routing-table announce/push (port-agnostic — observed on both 5033 and 5034)
     OP_BULK_READ       = 0x4221  # bulk property read (constant 273-byte preallocated request body — see PROTOCOL.md §10.8. Distinct from 0x4220's 222-byte form.)
     OP_BULK_WRITE      = 0x4222  # BulkPropertyWrite — the canonical opcode for SYST setpoint writes; 0x0240 against SYST returns 0x0E15
-    OP_PROPERTY_ECHO   = 0x0241  # SYST-scoped PropertyEcho / DefaultPropertyResolve — see PROTOCOL.md §9.5
+    OP_POINT_CMD_PRIORITY = 0x0241  # AP2_POINT_CMD_PRIORITY: commands at, or releases, a priority (PROTOCOL.md §9.3) — a write, refused by check_emit_allowed
     OP_STATUS_QUERY    = 0x0050  # leaks supervisor name (bare form) without authentication; useful cold-discovery primitive
     # ---- EBLN management set, 0x4620-0x4642 ------------------------------
     # Validated span 0x4620-0x4640. Names from the AP2 function enumeration,

@@ -103,7 +103,7 @@ OP_SYSTEM_INFO_LEGACY  = 0x0100
 OP_SYSTEM_INFO_COMPACT = 0x010C
 OP_COV_ENABLE          = 0x0271   # was OP_READ_LEGACY; PROTOCOL.md §9.3 withdrew that reading
 OP_READ_SHORT          = 0x0220
-OP_WRITE_QUALITY       = 0x0240
+OP_POINT_CMD_VALUE     = 0x0240   # AP2_POINT_CMD_VALUE
 OP_PROPERTY_READ_PATH  = 0x0294
 OP_VALUE_PUSH          = 0x0274
 OP_SERVICES_RENDERED   = 0x010D
@@ -611,7 +611,7 @@ class VirtualPxc:
             OP_STATUS_QUERY:        self._handle_status_query,
             OP_COV_ENABLE:          self._handle_read,
             OP_READ_SHORT:          self._handle_read,
-            OP_WRITE_QUALITY:       self._handle_write_0x0240,
+            OP_POINT_CMD_VALUE:     self._handle_write_0x0240,
             OP_BULK_WRITE:          self._handle_write_0x4222,
             OP_DEVICE_INSTALL:      self._handle_device_install,
             OP_DEVICE_COMMIT:       self._handle_device_commit,
