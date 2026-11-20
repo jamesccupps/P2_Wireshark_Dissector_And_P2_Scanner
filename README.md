@@ -141,6 +141,12 @@ Click a P2 packet and get:
 The Protocol column shows `P2` on TCP/5033 and TCP/5034 traffic. You can also load it
 ad hoc: `tshark -X lua_script:p2.lua -r capture.pcapng`.
 
+**Ubuntu 26.04's packaged `tshark`** runs under an AppArmor profile. In this project's
+CI (November 2026) it refused to open `~/.local/lib/wireshark/plugins/`, and a
+`p2.lua` elsewhere in the home directory, while a copy under `/tmp` loaded. If `tshark`
+ignores the plugin there, load it with `-X lua_script:` from such a location. The
+Wireshark GUI was not tested.
+
 **If it loads but nothing decodes**, check that the protocol is not disabled.
 Wireshark remembers a disabled protocol across sessions, in
 `%APPDATA%\Wireshark\disabled_protos` (`~/.config/wireshark/disabled_protos`),

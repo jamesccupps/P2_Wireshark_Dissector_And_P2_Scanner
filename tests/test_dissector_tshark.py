@@ -12,6 +12,13 @@ The hostile frames are seeded mutations of the synthetic sample capture, each on
 its own TCP stream so one cannot swallow another in reassembly. A planted
 `error()` in a copy of p2.lua must be seen, so a clean result means something.
 
+Every file tshark reads is first copied into pytest's temporary directory. On
+Ubuntu 26.04 the packaged tshark runs under an AppArmor profile that refused to
+open `p2.lua` in the checkout and the personal plugin folder
+`~/.local/lib/wireshark/plugins/`, while files under /tmp loaded (CI, 2026-11-20:
+kernel DENIED records for exactly those paths). Staging keeps the test about
+p2.lua rather than about a distribution's confinement policy.
+
 Skips when tshark is not on PATH, unless P2_REQUIRE_TSHARK is set: the CI job
 that installs tshark sets it, so a missing tshark there fails instead of passing
 quietly.
@@ -46,13 +53,24 @@ TIMEOUT_S = 180
 
 
 @pytest.fixture(scope="module")
+def staged(tmp_path_factory):
+    """Copies of p2.lua and the sample capture where a confined tshark may read
+    them (see the module docstring)."""
+    d = tmp_path_factory.mktemp("staged")
+    lua, sample = d / "p2.lua", d / SAMPLE.name
+    shutil.copyfile(LUA, lua)
+    shutil.copyfile(SAMPLE, sample)
+    return lua, sample
+
+
+@pytest.fixture(scope="module")
 def config_dir(tmp_path_factory):
     """An empty Wireshark configuration: no profile can disable p2, and no
     personal copy of the plugin can collide with the one loaded here."""
     return tmp_path_factory.mktemp("wireshark_config")
 
 
-def tshark(config_dir, capture, *args, lua=LUA, timeout=TIMEOUT_S):
+def tshark(config_dir, capture, *args, lua, timeout=TIMEOUT_S):
     env = dict(os.environ, WIRESHARK_CONFIG_DIR=str(config_dir))
     res = subprocess.run([TSHARK, "-X", "lua_script:%s" % lua, "-r", str(capture), *args],
                          capture_output=True, timeout=timeout, env=env)
@@ -70,18 +88,20 @@ def p2_trees(out):
 # ---------------------------------------------------------------------------
 # The sample, and a planted error
 
-def test_the_sample_dissects_as_documented(config_dir):
-    rc, out = tshark(config_dir, SAMPLE, "-Y", "p2", "-T", "fields", "-e", "frame.number")
+def test_the_sample_dissects_as_documented(config_dir, staged):
+    lua, sample = staged
+    rc, out = tshark(config_dir, sample, "-Y", "p2", "-T", "fields", "-e", "frame.number",
+                     lua=lua)
     assert rc == 0, out[-2000:]
     assert len([l for l in out.splitlines() if l.strip().isdigit()]) == SAMPLE_P2_FRAMES
 
-    rc, out = tshark(config_dir, SAMPLE, "-V")
+    rc, out = tshark(config_dir, sample, "-V", lua=lua)
     assert rc == 0
     assert lua_errors(out) == []
     assert "[Malformed Packet" not in out
 
 
-def test_a_planted_error_is_seen(config_dir, tmp_path):
+def test_a_planted_error_is_seen(config_dir, staged, tmp_path):
     """The check the fuzz test relies on has to be able to fail."""
     src = LUA.read_text(encoding="utf-8")
     m = re.search(r"^function p2\.dissector\([^)]*\)\n", src, re.M)
@@ -90,7 +110,7 @@ def test_a_planted_error_is_seen(config_dir, tmp_path):
     planted.write_text(src[:m.end()]
                        + '  if tvb:len() > 100 then error("planted control") end\n'
                        + src[m.end():], encoding="utf-8")
-    rc, out = tshark(config_dir, SAMPLE, "-V", lua=planted)
+    rc, out = tshark(config_dir, staged[1], "-V", lua=planted)
     assert any("planted control" in line for line in lua_errors(out))
 
 
@@ -170,10 +190,10 @@ def hostile_capture(tmp_path_factory):
     return path, len(records)
 
 
-def test_hostile_frames_never_raise_or_hang(config_dir, hostile_capture):
+def test_hostile_frames_never_raise_or_hang(config_dir, staged, hostile_capture):
     path, n = hostile_capture
     assert n == SAMPLE_P2_FRAMES * MUTANTS_PER_FRAME
-    rc, out = tshark(config_dir, path, "-V")          # a hang is a TimeoutExpired
+    rc, out = tshark(config_dir, path, "-V", lua=staged[0])   # a hang is a TimeoutExpired
     assert rc == 0, out[-2000:]
     assert p2_trees(out) > n // 2, "the dissector did not engage; the zeros below would mean nothing"
     assert lua_errors(out) == [], sorted(set(lua_errors(out)))[:10]
