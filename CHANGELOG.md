@@ -2,6 +2,49 @@
 
 ## Unreleased
 
+**Renamed: update code that imports these.** `P2Message.OP_WRITE_QUALITY` is now
+`OP_POINT_CMD_VALUE`; `P2Message.OP_PROPERTY_ECHO` is now `OP_POINT_CMD_PRIORITY`;
+`virtual_pxc.OP_WRITE_QUALITY` is now `OP_POINT_CMD_VALUE`.
+
+### The bridge accepted BACnet writes
+
+bacpypes3's `Application` answers WriteProperty and WritePropertyMultiple for every
+property of every local object, whatever the device advertises, and the bridge used it
+as is. A BACnet client could overwrite a bridged `presentValue` (until the next poll),
+set `outOfService`, or rename a point or the device (until a restart). **Nothing reached
+a panel** — the P2 side only reads — but a supervisor read whatever had been written,
+while the README said writes were rejected. They are now: both requests are refused as
+an unsupported service. Found by trying a write on loopback, not by reading the claim.
+
+### The emit guard refuses what §9.3 says it must
+
+`PROTOCOL.md` §9.3 says a read-only tool refuses the catalog's DESTRUCTIVE opcodes in
+code. The guard covered the EBLN block only, so 18 of the 28 went unrefused: node and
+cabinet state, cold and warm start, boot monitor, license deletion, memory modify,
+point command, flash restore and erase. They are refused now, with `0x4222` (a point
+write) and the P1 tunnels `0x0313`/`0x0314`, which carry any field-bus command. No tool
+here sends any of them; a test reads the catalog from `PROTOCOL.md` itself.
+
+### The dissector is tested
+
+Nothing in CI ran `p2.lua`. A fourth job installs tshark and checks the sample capture
+(47 P2 frames, none malformed), a planted error (so a clean run means something), and
+1,880 seeded hostile frames: no Lua error, no malformed packet, no hang.
+`analyze_pcap.py --decode` survives the same frames. Every run uses an empty Wireshark
+profile, because a profile with `p2` in `disabled_protos` loads the plugin and never
+calls it. **If P2 shows as plain TCP in your Wireshark, check Analyze — Enabled
+Protocols.**
+
+### Also
+
+- `0x0240` and `0x0241` are named after the catalog's point commands (above). "Property
+  echo" had no support anywhere.
+- CI runs Python 3.14 as well (3.10–3.14).
+- The bridge allows bacpypes3 0.1.x: its tests and a loopback ReadProperty round trip
+  give the same results as 0.0.110. Its tested-range note claimed 0.0.115, which does
+  not exist.
+- **350 tests** across four jobs (256 scanner and dissector, 22 virtual PXC, 72 bridge).
+
 - **`PROTOCOL.md` §5.5.1: P1 Who Are You through the `0x0314` line test**, contributed
   by AutomataNexus ([#1](https://github.com/jamesccupps/P2_Wireshark_Dissector_And_P2_Scanner/pull/1)).
   The first P1 bytes in the document: the Who Are You command (`0x80`) and its reply
