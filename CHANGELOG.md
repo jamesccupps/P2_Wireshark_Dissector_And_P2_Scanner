@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `tests/test_listen_push.py` slept a fixed second, then connected to the push listener
+  once. On a loaded CI runner the listener was not yet bound, and the 2.12.0 commit
+  failed on `main` after passing twice on its pull request. It now retries until the
+  listener is up. Test-only; the listener was never at fault.
+
 ## v2.12.0 — refusing writes, on both sides (2026-11-20)
 
 **Versions:** toolkit 2.12.0 · `p2_scanner` 1.6.0 · bridge 0.6.0. `p2.lua` is unchanged

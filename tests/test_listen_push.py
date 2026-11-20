@@ -64,6 +64,24 @@ def _cov_body(name: bytes = b"ROOM TEMP", value: float = 72.5) -> bytes:
     )
 
 
+def _connect(port: int, deadline_s: float = 8.0) -> socket.socket:
+    """Connect as soon as the listener is listening.
+
+    The listener binds on its own thread. This used to sleep a fixed second and
+    try once, which is a race: on a loaded CI runner (2026-11-20, the 3.13
+    scanner job, on a commit that had passed twice before) the listener was not
+    yet bound and the connect was refused.
+    """
+    deadline = time.monotonic() + deadline_s
+    while True:
+        try:
+            return socket.create_connection(("127.0.0.1", port), timeout=3)
+        except ConnectionRefusedError:
+            if time.monotonic() > deadline:
+                raise
+            time.sleep(0.05)
+
+
 def _listen_once(tmp_path, frame: bytes, duration: int = 4):
     """Run the listener on loopback, deliver one frame, return emitted events."""
     out = tmp_path / "events.jsonl"
@@ -76,8 +94,7 @@ def _listen_once(tmp_path, frame: bytes, duration: int = 4):
         daemon=True,
     )
     t.start()
-    time.sleep(1.0)                      # let the bind settle
-    sock = socket.create_connection(("127.0.0.1", port), timeout=3)
+    sock = _connect(port)
     sock.sendall(frame)
     time.sleep(0.5)
     sock.close()
