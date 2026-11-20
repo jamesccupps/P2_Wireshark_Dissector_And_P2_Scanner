@@ -82,7 +82,7 @@ if not _bp3_ok:
         "requires bacpypes3 >= 0.0.100 for the Application.from_object_list "
         "API and the local.device import path.\n\n"
         "Fix:\n"
-        "    pip install --upgrade --force-reinstall \"bacpypes3>=0.0.100,<0.1\"\n\n"
+        "    pip install --upgrade --force-reinstall \"bacpypes3>=0.0.100,<0.2\"\n\n"
         "If pip refuses because another package (commonly BAC0) is pinning "
         "an older version, the --force-reinstall flag overrides it. The "
         "bridge does not depend on BAC0 — only on bacpypes3 directly.\n"

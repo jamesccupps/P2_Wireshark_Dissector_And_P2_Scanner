@@ -1,10 +1,11 @@
 # BACnet protocol stack. Pinned to a tested range — pre-1.0 releases
 # can include breaking API changes. Tested working range:
-#   0.0.100 to 0.0.115
+#   0.0.100 to 0.0.110, and 0.1.0 (2026-11-20: the test suite, plus a
+#   loopback ReadProperty round trip against the bridge's own application)
 # If you hit AttributeError on Application.from_object_list or import
 # errors from bacpypes3.local.device, your installed version is too old.
-# Run: pip install --upgrade --force-reinstall "bacpypes3>=0.0.100,<0.1"
-bacpypes3>=0.0.100,<0.1
+# Run: pip install --upgrade --force-reinstall "bacpypes3>=0.0.100,<0.2"
+bacpypes3>=0.0.100,<0.2
 
 # Optional — improves the GUI's "Bind interface" dropdown by showing
 # adapter names (e.g. "Ethernet (192.168.1.10)") instead of bare IPs.
