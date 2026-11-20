@@ -29,6 +29,13 @@ protocol's AP2 function-code vocabulary.
 
 <sub>A capture of `p2_scanner.py` reading the virtual PXC panel on loopback (fictional BLN, node and points), opened in Wireshark with `p2.lua`.</sub>
 
+> **v2.12.0 — the bridge accepted BACnet writes; it now refuses them.** Its BACnet
+> library answers WriteProperty by default, and the bridge never turned that off: a
+> BACnet client could change the values a supervisor reads. No panel was ever written.
+> The scanner's send guard now also refuses every operation `PROTOCOL.md` flags
+> destructive, and CI runs the dissector under tshark. **Two constants were renamed**
+> — see the [changelog](CHANGELOG.md).
+>
 > **v2.11.0 — cold discovery was framing most of its probes wrong.** Three
 > frame builders hard-coded the header's `msg_type` instead of computing it from
 > the routing slots, so a real panel silently dropped most candidate node names

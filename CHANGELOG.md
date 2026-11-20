@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## v2.12.0 — refusing writes, on both sides (2026-11-20)
+
+**Versions:** toolkit 2.12.0 · `p2_scanner` 1.6.0 · bridge 0.6.0. `p2.lua` is unchanged
+(2.11.0).
 
 **Renamed: update code that imports these.** `P2Message.OP_WRITE_QUALITY` is now
 `OP_POINT_CMD_VALUE`; `P2Message.OP_PROPERTY_ECHO` is now `OP_POINT_CMD_PRIORITY`;
