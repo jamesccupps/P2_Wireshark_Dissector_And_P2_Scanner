@@ -22,6 +22,11 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+# No job writes to the repository, so the token gets read access only rather
+# than the repository's default scope.
+permissions:
+  contents: read
+
 jobs:
   virtual-pxc:
     name: virtual PXC (no dependencies)
